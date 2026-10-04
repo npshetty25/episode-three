@@ -1,0 +1,57 @@
+{
+ "Page": {
+  "pageInfo": {
+   "hasNextPage": false
+  },
+  "airingSchedules": [
+   {
+    "episode": 1,
+    "airingAt": 1696687200
+   },
+   {
+    "episode": 2,
+    "airingAt": 1697292000
+   },
+   {
+    "episode": 3,
+    "airingAt": 1697896800
+   },
+   {
+    "episode": 4,
+    "airingAt": 1698501600
+   },
+   {
+    "episode": 5,
+    "airingAt": 1699106400
+   },
+   {
+    "episode": 6,
+    "airingAt": 1699711200
+   },
+   {
+    "episode": 7,
+    "airingAt": 1700316000
+   },
+   {
+    "episode": 8,
+    "airingAt": 1700920800
+   },
+   {
+    "episode": 9,
+    "airingAt": 1701525600
+   },
+   {
+    "episode": 10,
+    "airingAt": 1702130400
+   },
+   {
+    "episode": 11,
+    "airingAt": 1702735200
+   },
+   {
+    "episode": 12,
+    "airingAt": 1703340000
+   }
+  ]
+ }
+}

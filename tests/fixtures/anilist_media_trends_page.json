@@ -1,0 +1,509 @@
+{
+ "Page": {
+  "pageInfo": {
+   "hasNextPage": true
+  },
+  "mediaTrends": [
+   {
+    "mediaId": 158927,
+    "date": 1696690800,
+    "trending": 13054,
+    "averageScore": 0,
+    "popularity": 65868,
+    "inProgress": 8632,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1696777200,
+    "trending": 5789,
+    "averageScore": 82,
+    "popularity": 69925,
+    "inProgress": 20154,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1696863600,
+    "trending": 3226,
+    "averageScore": 82,
+    "popularity": 72739,
+    "inProgress": 26186,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1696950000,
+    "trending": 1975,
+    "averageScore": 82,
+    "popularity": 74273,
+    "inProgress": 28942,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697036400,
+    "trending": 1569,
+    "averageScore": 82,
+    "popularity": 75328,
+    "inProgress": 30767,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697122800,
+    "trending": 1358,
+    "averageScore": 82,
+    "popularity": 76155,
+    "inProgress": 32012,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697209200,
+    "trending": 1309,
+    "averageScore": 82,
+    "popularity": 76898,
+    "inProgress": 33179,
+    "releasing": true,
+    "episode": 2
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697295600,
+    "trending": 11203,
+    "averageScore": 82,
+    "popularity": 77549,
+    "inProgress": 34182,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697382000,
+    "trending": 5794,
+    "averageScore": 82,
+    "popularity": 78621,
+    "inProgress": 35619,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697468400,
+    "trending": 3170,
+    "averageScore": 81,
+    "popularity": 79579,
+    "inProgress": 36890,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697554800,
+    "trending": 2002,
+    "averageScore": 81,
+    "popularity": 80206,
+    "inProgress": 37694,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697641200,
+    "trending": 1602,
+    "averageScore": 81,
+    "popularity": 80813,
+    "inProgress": 38392,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697727600,
+    "trending": 1336,
+    "averageScore": 81,
+    "popularity": 81256,
+    "inProgress": 38914,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697814000,
+    "trending": 1387,
+    "averageScore": 81,
+    "popularity": 81667,
+    "inProgress": 39407,
+    "releasing": true,
+    "episode": 3
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697900400,
+    "trending": 10447,
+    "averageScore": 81,
+    "popularity": 82095,
+    "inProgress": 39890,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1697986800,
+    "trending": 5642,
+    "averageScore": 81,
+    "popularity": 82745,
+    "inProgress": 40677,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698073200,
+    "trending": 3243,
+    "averageScore": 81,
+    "popularity": 83378,
+    "inProgress": 41375,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698159600,
+    "trending": 2118,
+    "averageScore": 81,
+    "popularity": 83869,
+    "inProgress": 41920,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698246000,
+    "trending": 1653,
+    "averageScore": 81,
+    "popularity": 84332,
+    "inProgress": 42403,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698332400,
+    "trending": 1332,
+    "averageScore": 81,
+    "popularity": 84722,
+    "inProgress": 42797,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698418800,
+    "trending": 1315,
+    "averageScore": 81,
+    "popularity": 85023,
+    "inProgress": 43066,
+    "releasing": true,
+    "episode": 4
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698505200,
+    "trending": 9176,
+    "averageScore": 81,
+    "popularity": 85334,
+    "inProgress": 43387,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698591600,
+    "trending": 5532,
+    "averageScore": 81,
+    "popularity": 85838,
+    "inProgress": 43906,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698678000,
+    "trending": 3085,
+    "averageScore": 81,
+    "popularity": 86373,
+    "inProgress": 44417,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698764400,
+    "trending": 1935,
+    "averageScore": 81,
+    "popularity": 86743,
+    "inProgress": 44756,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698850800,
+    "trending": 1878,
+    "averageScore": 80,
+    "popularity": 87062,
+    "inProgress": 45060,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1698937200,
+    "trending": 1495,
+    "averageScore": 80,
+    "popularity": 87401,
+    "inProgress": 45391,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699023600,
+    "trending": 1445,
+    "averageScore": 80,
+    "popularity": 87728,
+    "inProgress": 45686,
+    "releasing": true,
+    "episode": 5
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699110000,
+    "trending": 9765,
+    "averageScore": 80,
+    "popularity": 88038,
+    "inProgress": 45943,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699196400,
+    "trending": 5496,
+    "averageScore": 80,
+    "popularity": 88539,
+    "inProgress": 46417,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699282800,
+    "trending": 3076,
+    "averageScore": 80,
+    "popularity": 89021,
+    "inProgress": 46871,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699369200,
+    "trending": 2183,
+    "averageScore": 80,
+    "popularity": 89418,
+    "inProgress": 47226,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699455600,
+    "trending": 1710,
+    "averageScore": 80,
+    "popularity": 89735,
+    "inProgress": 47517,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699542000,
+    "trending": 1422,
+    "averageScore": 80,
+    "popularity": 89989,
+    "inProgress": 47750,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699628400,
+    "trending": 1396,
+    "averageScore": 80,
+    "popularity": 90238,
+    "inProgress": 47975,
+    "releasing": true,
+    "episode": 6
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699714800,
+    "trending": 9953,
+    "averageScore": 80,
+    "popularity": 90525,
+    "inProgress": 48205,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699801200,
+    "trending": 5555,
+    "averageScore": 80,
+    "popularity": 90898,
+    "inProgress": 48530,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699887600,
+    "trending": 3128,
+    "averageScore": 80,
+    "popularity": 91298,
+    "inProgress": 48917,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1699974000,
+    "trending": 2065,
+    "averageScore": 80,
+    "popularity": 91590,
+    "inProgress": 49165,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700060400,
+    "trending": 1688,
+    "averageScore": 80,
+    "popularity": 91863,
+    "inProgress": 49410,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700146800,
+    "trending": 1276,
+    "averageScore": 81,
+    "popularity": 92093,
+    "inProgress": 49608,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700233200,
+    "trending": 1345,
+    "averageScore": 80,
+    "popularity": 92334,
+    "inProgress": 49786,
+    "releasing": true,
+    "episode": 7
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700319600,
+    "trending": 10009,
+    "averageScore": 81,
+    "popularity": 92567,
+    "inProgress": 49995,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700406000,
+    "trending": 5287,
+    "averageScore": 81,
+    "popularity": 92918,
+    "inProgress": 50280,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700492400,
+    "trending": 3085,
+    "averageScore": 81,
+    "popularity": 93251,
+    "inProgress": 50557,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700578800,
+    "trending": 2031,
+    "averageScore": 81,
+    "popularity": 93525,
+    "inProgress": 50764,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700665200,
+    "trending": 1597,
+    "averageScore": 81,
+    "popularity": 93803,
+    "inProgress": 50967,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700751600,
+    "trending": 1329,
+    "averageScore": 81,
+    "popularity": 94044,
+    "inProgress": 51181,
+    "releasing": true,
+    "episode": null
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700838000,
+    "trending": 1240,
+    "averageScore": 81,
+    "popularity": 94284,
+    "inProgress": 51386,
+    "releasing": true,
+    "episode": 8
+   },
+   {
+    "mediaId": 158927,
+    "date": 1700924400,
+    "trending": 9425,
+    "averageScore": 81,
+    "popularity": 94508,
+    "inProgress": 51556,
+    "releasing": true,
+    "episode": null
+   }
+  ]
+ }
+}
