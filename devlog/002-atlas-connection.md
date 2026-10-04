@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-04
 - **Task:** TASK 002 from the instructor (spec v1.0)
-- **Status:** Built and verified by the developer. **Waiting on Nirav's acceptance run**, including the actual `--yes` drop, which is left for him to run.
+- **Status:** Done. All acceptance criteria pass (Nirav's run, 2026-10-04).
 
 ## Summary
 
@@ -51,7 +51,18 @@ Only `sample_mflix` was loaded; there are no other `sample_*` databases. The Atl
 
 ## Acceptance run by Nirav
 
-*To be filled in from Nirav's output:* criteria 1–3 and 5, and the total after the drop.
+| # | Command | Result |
+|---|---|---|
+| 1 | `python -m scripts.check_db` | `Ping OK (MongoDB server version 8.0.34)`; `sample_mflix 143.03 MB`; total 143.03 MB (27.9%); `Round trip OK (1449 ms)` ✅ |
+| 2 | `python -m scripts.drop_sample_data` | Lists `sample_mflix 143.03 MB`, "Dry run: nothing was dropped" ✅ |
+| 3 | `python -m scripts.drop_sample_data --yes` | `Dropped sample_mflix`, done by the script itself (no permission error) ✅ |
+| 3 | `python -m scripts.check_db` (after) | No `sample_*` databases; **total 0.00 MB of 512 MB (0.0%)**; `Round trip OK (228 ms)` ✅ |
+| 4 | Missing `MONGODB_URI` | Verified in the developer run (friendly message, exit 1) ✅ |
+| 5 | `git status` | "nothing to commit, working tree clean", up to date with `origin/master` ✅. `git check-ignore .env` → `.env`; `.env.example` is committed ✅ |
+
+**Round-trip latency varies a lot:** 360 ms (developer run), 1449 ms (Nirav's first run, cold connections), 228 ms (after the drop). Long collection scripts should batch their writes and tolerate occasional slow requests.
+
+**Constraints (spec §14), answered by Nirav:** no fixed weekly-hour cap ("I can give my everything"), and no deadline. The project is for his resume, not tied to any upcoming placement drive.
 
 ## Failures and issues
 
@@ -80,5 +91,4 @@ Only `sample_mflix` was loaded; there are no other `sample_*` databases. The Atl
 
 ## Next
 
-- Nirav runs the acceptance commands; the developer fills in the section above and commits.
-- Then TASK 003: AniList trend-data probe.
+- TASK 003: AniList trend-data probe (instructor to send).
