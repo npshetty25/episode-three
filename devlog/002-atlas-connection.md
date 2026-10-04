@@ -64,6 +64,7 @@ Only `sample_mflix` was loaded; there are no other `sample_*` databases. The Atl
 - **`explain_error()` lives in `db.py`**, so every future script gets the same friendly messages. It also covers DNS/SRV lookup failures (spec risk 12 territory) and college-Wi-Fi port blocking, in addition to the three cases the task listed.
 - **Secrets are stripped from every error message** (URI and password, raw and URL-decoded), after the leak recorded in devlog 001.
 - **Sizes in MB = 1024² bytes**, which matches the Atlas dashboard.
+- **Process change (Nirav's request):** from now on, commit and push one logical change at a time, not one commit per task. Every commit must still be a coherent, working step. Commits are confirmed linked to `npshetty25` on the default branch. They only appear on the contribution graph once "Private contributions" is enabled in the profile settings.
 
 ## Questions and spec notes for the instructor
 
