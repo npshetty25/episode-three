@@ -28,6 +28,7 @@ Set up the local Python project, a free MongoDB Atlas cluster, MongoDB Compass, 
 - Windows 11, PowerShell, VS Code with Claude Code. Python 3.13.5, Git 2.52, GitHub CLI 2.83 (logged in as `npshetty25`).
 - Atlas free tier limits: 512 MB storage, 100 ops/sec, 500 connections, 10 GB in and 10 GB out per 7 days, no backups, auto-paused after 30 days with zero connections.
 - The region chosen at cluster creation was not recorded. AWS Mumbai (ap-south-1) was recommended; confirm in Atlas.
+- **Storage already used: 142.99 MB of 512 MB (28%)**, almost all of it the sample dataset (`sample_mflix` etc.). Keep it for query practice; drop the `sample_*` databases before large-scale data collection if the storage estimate needs the room.
 
 ## Verification
 
@@ -55,6 +56,12 @@ Set up the local Python project, a free MongoDB Atlas cluster, MongoDB Compass, 
 - Student benefit: claim the free certification voucher; skip the $50 Atlas credit, which needs a card and isn't used by the free tier.
 - GitHub repo stays private until the README and first model are presentable.
 - Java/JavaFX dropped from priorities (2026-10-03).
+
+## Follow-up (2026-10-04)
+
+- Atlas dashboard checked: cluster ACTIVE, FREE tier, 3/500 connections (Compass), backups and auto-scaling OFF as expected for the free tier.
+- Nirav given steps for **Python: Select Interpreter**; not yet confirmed.
+- Added check: Atlas IP Access List must contain only Nirav's own IPs, with no `0.0.0.0/0`, because the password was exposed. Not yet confirmed.
 
 ## Next
 
