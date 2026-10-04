@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-03 to 2026-10-04
 - **Requested by:** Nirav (before the instructor workflow started)
-- **Status:** Done. One follow-up is open: rotate the database password again (see Issue 4).
+- **Status:** Done. All follow-ups closed (Nirav confirmed 2026-10-04).
 
 ## Summary
 
@@ -63,8 +63,9 @@ Set up the local Python project, a free MongoDB Atlas cluster, MongoDB Compass, 
 - Nirav given steps for **Python: Select Interpreter**; not yet confirmed.
 - Added check: Atlas IP Access List must contain only Nirav's own IPs, with no `0.0.0.0/0`, because the password was exposed. Not yet confirmed.
 
+- **Closed:** Nirav confirmed the password was rotated a second time (`.env` and Compass updated), the venv interpreter is selected in VS Code, and the IP Access List was checked. Issues 4 and 5 are resolved.
+
 ## Next
 
-- Nirav: rotate the database password, then update `.env` and the Compass connection.
 - Task 002: first Python script that loads `.env`, connects to Atlas and runs `ping`.
 - Receive the full project handoff document from the instructor.
