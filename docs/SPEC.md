@@ -1,0 +1,443 @@
+# Episode Three: Project Spec v1.0 (2026-10-04)
+
+> Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version, not silent edits.
+
+## 1. Goal and positioning
+
+**The problem.** Trackers record what you've watched, but they can't answer two questions every viewer has: "Is this new show worth continuing?" and "Will I actually finish this?"
+
+**One-sentence pitch.** A personal tracker for everything I watch and listen to, with two ML models: one predicts a new anime season's final score after only three episodes, the other predicts whether I personally will finish or drop a show.
+
+**What is NOT unique (say this openly in the README):**
+- Unified tracking of anime, shows, and movies: Ryot and Simkl already do this.
+- Linking anime to their opening/ending songs: the Kitsune app does this, and the AniMusic student project generates playlists from AniList watch history.
+
+**What IS unique (as far as our research found):**
+- Model A: predicting a season's *final* score from data available after episode 3.
+- Model B: a per-user finish-vs-drop predictor.
+- The two combined: Model A's prediction feeds Model B for currently airing shows.
+
+**Claims Nirav must never make:**
+- "Nothing like this exists" or "the first tracker that..."
+- "Predicts whether you'll like a show" (Model B predicts finishing vs dropping, not enjoyment).
+- Any accuracy number not produced by our own test-set evaluation.
+- That the models use real-time data if they use snapshots.
+- Anything implying endorsement by AniList, TMDB, Trakt, or YouTube.
+
+## 2. Scope
+
+**MVP features:**
+1. Anime tracker synced from Nirav's AniList account.
+2. TV and movie tracker synced from Nirav's Trakt account.
+3. Model A (anime only), trained and evaluated against baselines.
+4. Model B (anime only), trained and evaluated against baselines.
+5. Streamlit dashboard: Home, Tracker, Season Forecast, Will I Finish?, Model Report, About & Credits.
+
+**Later features (after MVP):**
+- YouTube Music: listening history, playlist sync, anime theme-song links, "you replay this opening but haven't watched the show."
+- TMDB enrichment (posters, episode ratings) and an experimental Model A for TV shows.
+- Synced lyrics for the current song.
+
+**Out of scope:** Java/JavaFX, desktop widget, FastAPI service, Spotify, public deployment, multi-user accounts, survival analysis, writing data back to AniList or Trakt.
+
+**MVP definition of done:**
+- Both syncs run repeatedly without creating duplicates.
+- Both models have a committed evaluation report showing results against every baseline.
+- All MVP dashboard pages work locally.
+- Tests pass.
+- The README draft includes the results table and an honest limitations section.
+
+## 3. Features (what Nirav sees)
+
+| Feature | On screen | What it does |
+|---|---|---|
+| Anime sync | "Last synced" time on Home | Pulls Nirav's AniList list and upserts it into MongoDB |
+| TV/movie sync | Same | Pulls Trakt watched history and dropped shows |
+| Tracker | Table with filters (type, status, year) and cover images | Shows all entries in one place |
+| Season Forecast | Current-season anime with at least 3 aired episodes: episode-3 score, predicted finale score ± typical error | Model A |
+| Will I Finish? | Nirav's planning list ranked by drop probability | Model B |
+| Model Report | Metrics vs baselines, error charts | Reads committed evaluation reports |
+| About & Credits | Data-source credits, TMDB notice, limitations | Satisfies attribution terms |
+| *(Later)* Music | Recent plays, top artists, playlists, theme-song links | YouTube Music and AnimeThemes |
+
+## 4. Data sources
+
+### 4.1 AniList GraphQL (anime: Nirav's list, metadata, score trends)
+- **Endpoint:** `POST https://graphql.anilist.co`, JSON body `{"query": ..., "variables": ...}`. Docs: https://docs.anilist.co
+- **Auth:** none for public data. Nirav's list must be public, or we add OAuth later. No account or key needed for MVP.
+- **Rate limit:** the API is currently degraded and limited to 30 requests per minute as a temporary measure, normally 90. Exceeding it gives a 1-minute timeout, and a separate burst limiter blocks too many requests in a very short period.
+  - **Our rule:** one shared helper sleeps about 2.2 seconds between requests (≈27/min), and on HTTP 429 waits for `Retry-After` seconds before retrying.
+- **Key queries and fields:**
+  - **Nirav's list:** `MediaListCollection(userName, type: ANIME)` → `lists { entries { status progress score startedAt completedAt updatedAt media { id idMal ... } } }`. Entries come in chunks, max 500 per chunk, so loop chunks.
+  - **Season listing:** `Page(perPage: 50) { media(season, seasonYear, type: ANIME, format_in: [TV, ONA]) {...} }`. Page allows max 50 entries per page.
+  - **Score trends:** `Page { mediaTrends(mediaId, releasing: true, sort: DATE) { date episode averageScore popularity inProgress trending } }`. Media trends are documented as the media's daily trend stats, with a filter for stats recorded while the media was releasing.
+  - **Media fields we keep:** `id idMal title format episodes duration season seasonYear source countryOfOrigin isAdult genres tags{name rank} studios(isMain:true){nodes{name}} averageScore popularity relations{edges{relationType node{id}}} coverImage{medium}`.
+- **Terms of use (important):** AniList is free for non-commercial use, prohibits using the API as a backup or data storage service, prohibits hoarding or mass collection of data, and prohibits use within competing services such as list/tracker services, unless they provide significant sustained syncing with AniList. For purely educational projects like school assignments, they say they tend to be lenient on the mass-collection rule.
+  - **Design consequences:**
+    - AniList stays the source of truth for Nirav's anime. We only *read* and sync it; we never maintain a separate anime list.
+    - Model A collection stays modest (about 1,000 shows).
+    - We do not mass-collect other users' lists (see OPEN-1).
+    - The app name never contains "AniList".
+
+### 4.2 Trakt (TV and movies: Nirav's history)
+- **Base URL:** `https://api.trakt.tv`. Headers: `trakt-api-version: 2`, `trakt-api-key: <client_id>`, `Authorization: Bearer <token>`. Docs: https://trakt.docs.apiary.io
+- **Auth:** OAuth 2.0 device flow: request a device code from /oauth/device/code, then poll /oauth/device/token, the flow intended for TV, console, and CLI apps.
+- **Accounts to create:** a Trakt account and an API app (gives client ID and secret, stored in `.env`).
+- **Endpoints (verify in docs during Phase 4):** `GET /sync/watched/shows`, `GET /sync/watched/movies`, `GET /sync/history`, and `GET /users/hidden/dropped`, which retrieves the user's dropped shows.
+- **Rate limit:** a Trakt GitHub issue this week cites 500 unauthenticated GET requests per 5 minutes. Authenticated limits are in the docs. We make only a handful of calls, but still handle HTTP 429.
+- **Caveat:** Trakt is changing account limits in 2026. Free accounts get a bigger watchlist of 250 instead of 100. Watch history isn't affected for our scale.
+
+### 4.3 TMDB (later: posters, TV episode ratings)
+- **Base URL:** `https://api.themoviedb.org/3`. Auth: API Read Access Token as a Bearer header. Account and API key application required.
+- **Endpoint:** `GET /tv/{series_id}/season/{season_number}`, whose response includes episodes with `vote_average` and `vote_count`.
+- **Rate limit:** TMDB disabled its legacy limits in 2019 but still has upper limits somewhere around 40 requests per second, and asks you to respect 429s.
+- **Terms:** free for non-commercial use with attribution; you must use the TMDB logo and show the notice that the product uses the TMDB API but is not endorsed or certified by TMDB, inside an About or Credits section. A third-party summary says the terms forbid caching TMDB data for longer than six months; verify in the terms when we reach that phase.
+
+### 4.4 ytmusicapi (later: YouTube Music)
+- **Docs:** https://ytmusicapi.readthedocs.io (stable docs are version 1.12.3). Unofficial and can break.
+- **Auth:** the docs call OAuth the simplest authentication method, but YouTube removed ytmusicapi's shared OAuth client in November 2024, so you need your own client ID from Google Cloud. The CLI now labels browser-cookie setup as deprecated. **OPEN-7.**
+- **Calls:** `get_history()`, `get_library_playlists()`, `get_playlist()`, `get_lyrics()`.
+- **Caveat:** history items carry relative labels ("Today", "Yesterday") rather than exact timestamps. Verify in Phase 10. Deduplication will rely on observed order, not timestamps.
+
+### 4.5 AnimeThemes (later: theme songs)
+- **Use GraphQL** at `https://graphql.animethemes.moe` (explorer: `/graphiql`). The JSON:API is deprecated and will be removed.
+- **Rate limit:** 90 requests per minute; respect `Retry-After`.
+- Exact query (anime by AniList ID → themes → songs → artists) to be confirmed in the explorer during Phase 10.
+
+### 4.6 Kaggle MyAnimeList 2020 dataset (Model B training data, recommended)
+- https://www.kaggle.com/hernan4444/anime-recommendation-database-2020 (manual download with a Kaggle account).
+- `animelist.csv` holds every user's anime with score, watching status, and number of episodes watched: 109 million rows covering 17,562 anime and 325,772 users, about 1.9 GB. Users are numeric IDs, not usernames.
+- **Caveat:** it includes adult anime, which we filter out. The license still needs checking on the Kaggle page (Task 004).
+
+### OPEN-1: Model B training data
+- **(a) Kaggle MAL 2020 sample.** No API collection, no terms risk, data already anonymized. Downsides: 2020 data, MAL users rather than AniList users.
+- **(b) Collect AniList user lists.** Fresh data, but conflicts with the no-mass-collection rule unless AniList agrees.
+- **(c) Both:** train on Kaggle, then validate on a small AniList sample (about 300 users) only after emailing contact@anilist.co.
+- **Recommendation: (a) for MVP, (c) as an optional extension.** It also gives a good interview answer: "I read the API terms and designed around them."
+
+## 5. MongoDB design
+
+**Database:** `episode_three` (tests use `episode_three_test`).
+
+**Free-tier constraints that shape the design:**
+- Storage is capped at 0.5 GB, counting uncompressed BSON of all documents plus their indexes.
+- 100 operations per second, so bulk writes use `insert_many` / `bulk_write`.
+- Aggregations ignore `allowDiskUse`, pipelines max out at 50 stages, and in-memory sorts are limited to 32 MB, so heavy joins run in pandas instead.
+- No server-side JavaScript.
+- The cluster pauses after 30 days with zero connections.
+
+**Conventions:** readable snake_case field names, dates stored as BSON dates in UTC, string `_id`s prefixed with their source so IDs from different sources never collide. Every sync uses upserts keyed on `_id`, so re-running never duplicates.
+
+### Collections
+
+**`titles`**: one document per anime, show, or movie. Indexes: `media_type`; `mal_id` (to join with Kaggle data); `(season_year, season)`.
+```json
+{
+  "_id": "anilist:154587",
+  "source": "anilist",
+  "media_type": "anime",
+  "title": {"romaji": "Sousou no Frieren", "english": "Frieren: Beyond Journey's End"},
+  "mal_id": 52991,
+  "format": "TV", "episodes": 28, "duration_min": 24,
+  "season": "FALL", "season_year": 2023,
+  "source_material": "MANGA", "country": "JP", "is_adult": false,
+  "genres": ["Adventure", "Drama", "Fantasy"],
+  "tags": [{"name": "Elf", "rank": 95}],
+  "main_studios": ["Madhouse"],
+  "relations": [{"type": "SEQUEL", "id": "anilist:182255"}],
+  "cover_url": "https://...",
+  "current_average_score": 90,
+  "current_popularity": 420000,
+  "fetched_at": {"$date": "2026-10-05T10:00:00Z"}
+}
+```
+TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs stored in `trakt_ids`. Values above are illustrative.
+
+**`my_entries`**: Nirav's tracker, one document per title. References `titles` via `title_id`. Index: `(media_type, status)` for dashboard filters.
+```json
+{
+  "_id": "anilist:154587",
+  "title_id": "anilist:154587",
+  "media_type": "anime",
+  "status": "completed",
+  "progress": 28,
+  "my_score": 95,
+  "started_at": {"$date": "2024-01-02T00:00:00Z"},
+  "completed_at": {"$date": "2024-02-10T00:00:00Z"},
+  "source_updated_at": {"$date": "2024-02-10T18:22:00Z"},
+  "synced_at": {"$date": "2026-10-05T10:00:00Z"}
+}
+```
+Status is normalized across sources to: `watching | completed | dropped | planning | paused | repeating`.
+
+**`score_trends`**: time-series snapshots for Model A, stored as **one document per anime with an embedded array**. The array is naturally bounded (about 90–200 daily records while airing), so embedding is safe and lets one read return a show's whole history. Index: `(season_year, season)`.
+```json
+{
+  "_id": "anilist:154587",
+  "season": "FALL", "season_year": 2023,
+  "snapshots": [
+    {"date": {"$date": "2023-10-06T00:00:00Z"}, "episode": 4, "average_score": 89, "popularity": 152000, "in_progress": 98000, "trending": 1200}
+  ],
+  "n_snapshots": 112,
+  "collected_at": {"$date": "2026-10-06T09:00:00Z"}
+}
+```
+
+**`model_a_features`**: one row per eligible anime, built by an aggregation pipeline. Index: `split`.
+```json
+{"_id": "anilist:154587", "split": "train", "ep1_score": 87, "ep3_score": 89, "score_delta_1_3": 2,
+ "ep3_popularity": 180000, "popularity_growth_1_3": 1.4, "ep3_in_progress": 120000,
+ "episodes_planned": 28, "format": "TV", "source_material": "MANGA",
+ "genres": ["Adventure", "Drama", "Fantasy"], "is_sequel": false, "prequel_finale_score": null,
+ "label_finale_score": 91, "ep3_snapshot_date": {"$date": "2023-10-27T00:00:00Z"}}
+```
+
+**`mal_anime`** and **`mal_user_lists`**: Kaggle data, kept in separate collections so its source is always clear.
+```json
+{"_id": "mal:5114", "name": "Fullmetal Alchemist: Brotherhood", "type": "TV", "episodes": 64,
+ "genres": ["Action", "Adventure", "Drama"], "source_material": "Manga", "mal_score": 9.19, "members": 2248456}
+```
+```json
+{"_id": 12345, "split": "train", "n_entries": 143,
+ "entries": [{"anime_id": "mal:5114", "status": "completed", "episodes_watched": 64, "role": "history"},
+             {"anime_id": "mal:1535", "status": "dropped",   "episodes_watched": 5,  "role": "target"}]}
+```
+User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks each entry as feature history or a prediction target (section 7).
+
+**`predictions`**: Index: `(model, title_id, created_at desc)`.
+```json
+{"model": "B", "model_version": "model_b_v1", "title_id": "anilist:21", "value": 0.31,
+ "label": "drop_probability", "created_at": {"$date": "2026-11-01T12:00:00Z"}}
+```
+
+**`sync_runs`**: one log document per sync or collection run (job, started_at, finished_at, status, counts, errors). It makes long collections resumable and shows "last synced" on Home. Index: `(job, started_at desc)`.
+
+**Later:** `listening_history` (unique index on `dedupe_key`), `playlists` (tracks embedded, `_id` = playlistId), `song_links` (anime ↔ theme songs).
+
+### Aggregation pipelines we need
+1. **Model A features:** `$unwind` snapshots → `$match` episode ∈ {1, 3} → `$sort` by date → `$group` by (anime, episode) taking `$last` → reshape into one row per anime → `$merge` into `model_a_features`.
+2. **Model B user history stats:** `$unwind` entries → `$match` role = history → `$group` by user → count, drops, drop rate. Per-genre drop rates join `mal_anime` genres in pandas, to avoid large `$lookup`s and sorts on the free tier.
+3. **Anime global drop rate (training users only):** `$unwind` → `$match` split = train → `$group` by anime_id.
+4. **Dashboard:** status counts per media type (`$group`); planning list joined to latest predictions (`$lookup` with a small pipeline).
+
+### Storage estimate (uncompressed data + indexes)
+| Collection | Size estimate |
+|---|---|
+| `titles` (~6,500 docs × ~2 KB) | ~13 MB |
+| `score_trends` (~1,000 × ~8 KB) | ~8 MB |
+| `model_a_features` | <1 MB |
+| `mal_anime` (~6,000 × ~0.5 KB) | ~3 MB |
+| `mal_user_lists` (5,000 users × ~200 entries × ~70 B) | ~70 MB |
+| `my_entries`, `predictions`, `sync_runs` | ~2 MB |
+| *(later)* `listening_history` (~50 plays/day) | ~6 MB/year |
+| Indexes (~15%) | ~15 MB |
+| **Total** | **~120 MB** of 512 MB |
+
+**The sample dataset must be measured and dropped** (TASK 002).
+
+**If usage passes 350 MB:** reduce Kaggle users to 3,000 → stop storing tags → move the Kaggle raw data to local CSVs and keep only aggregated features in Atlas → as a last resort, run a local MongoDB Community server for training data.
+
+## 6. Data collection plan
+
+- **Model A:**
+  - Seasons Winter 2019 to Summer 2026 (31 seasons).
+  - Eligible shows: format TV or ONA, 8–30 planned episodes, Japan, not adult, popularity of at least 2,000 at the episode-3 snapshot. Roughly 30–40 per season, about 1,000 total.
+  - Requests: about 62 for season listings plus about 3 per anime for trends, so ~3,100 requests at 27/min ≈ **2 hours**.
+  - Collection is resumable: it skips anime already in `score_trends` and logs to `sync_runs`.
+  - All of this depends on TASK 003 confirming the trend data exists.
+- **Model B:**
+  - Read `animelist.csv` in pandas chunks (it's too big for memory).
+  - Keep TV anime only, drop adult titles, keep only completed (status 2) and dropped (status 4) entries.
+  - Sample 5,000 users with at least 20 such entries (random seed 42). No API calls; about 30 minutes of local processing.
+- **Nirav's data:** AniList is 1–3 requests per sync. Trakt is about 4 requests. Run manually; scheduled later with Windows Task Scheduler.
+- **YouTube Music (later):** poll every 3 hours while the PC is on; insert only items newer than the last seen top item.
+- **Deduplication:** upserts on `_id` everywhere; a unique `dedupe_key` for listening history.
+- **Anonymization:** Kaggle IDs are already numeric. If AniList users are ever collected (OPEN-1c), store `sha256(SALT + user_id)` with the salt in `.env`, never store names, and never publish the raw data.
+
+## 7. The models
+
+### Model A: Episode-3 predictor (regression)
+- **Unit:** one eligible anime season.
+- **Snapshots:**
+  - `ep1` = latest trend record where episode = 1.
+  - `ep3` = latest trend record where episode = 3, i.e. the state just before episode 4 airs.
+- **Label (OPEN-2):** the finale score, i.e. `average_score` in the last trend record recorded while releasing. Store `current_average_score` for analysis only, never as a feature.
+- **Features (v1):**
+  - `ep3_score`, `ep1_score`, `score_delta_1_3`
+  - `ep3_popularity`, `popularity_growth_1_3` (ep3 ÷ ep1), `ep3_in_progress`
+  - `episodes_planned`, `format`, `source_material`, `genres` (multi-hot)
+  - `is_sequel`, `prequel_finale_score` (known before airing, so it's allowed)
+  - v2 additions: main-studio prior (computed from training rows only), top tags.
+- **Leakage rules:**
+  - No value dated after the ep3 snapshot.
+  - Never use `current_*` fields or the `stats` distributions.
+  - Any prior (studio, genre) is computed from training rows only.
+- **Split (by time):** train ≤ 2023 · validation 2024 · test 2025 through Summer 2026.
+- **Baselines:** B1 "finale = ep3 score"; B2 training-set mean; B3 linear regression on `ep3_score` alone.
+- **Candidate models:** Ridge, RandomForestRegressor, HistGradientBoostingRegressor. Pick by validation MAE, report test once.
+- **Metrics:** MAE (points on a 0–100 scale; primary), RMSE, % of predictions within ±3 points.
+- **Good enough:** test MAE at least 10% lower than B1. If not, publish the honest result anyway; "the episode-3 score is already a strong signal" is itself a finding.
+
+### Model B: Drop predictor (classification)
+- **Unit:** one (user, anime) entry with status completed or dropped. Label: dropped = 1.
+- **History/target split:** each user's entries are randomly split 80% history / 20% target (seed 42). Features come only from history; rows are targets.
+- **Features:**
+  - **User:** history drop rate, number of history entries, smoothed drop rate for this anime's genres, average episode count of completed shows.
+  - **Anime:** episodes, source, genres (multi-hot), community score, members (log scale), global drop rate from training users.
+- **Leakage rules:** user features never see that user's target entries; global drop rates use training users only.
+- **Split:** by user (`GroupShuffleSplit`), 70/15/15 train/validation/test. No user appears in two splits.
+- **Baselines:** B1 the anime's global drop rate; B2 the user's history drop rate; B3 logistic regression on both.
+- **Models:** LogisticRegression, RandomForestClassifier, HistGradientBoostingClassifier.
+- **Metrics:** ROC-AUC (primary), PR-AUC (classes are imbalanced), and precision/recall/F1 at a threshold chosen on validation.
+- **Good enough:** ROC-AUC at least 0.03 above the best baseline on test.
+- **Inference for Nirav:**
+  - Map his AniList entries to MAL IDs via `titles.mal_id`.
+  - Compute his user features from all his completed and dropped entries.
+  - Predict for his planning list.
+  - For currently airing shows, Model A's predicted finale score (converted from 0–100 to the 1–10 scale) replaces the community score. That's how the two models connect.
+- **Known limits:** 2020 MAL users may behave differently from AniList users in 2026; the 0–100 vs 1–10 score scales differ; the history/target split is random rather than by time, because Kaggle has no per-entry timestamps.
+
+### Storage, display, versioning (both models)
+- **Model file:** `artifacts/models/model_a_v1.joblib` (git-ignored).
+- **Report:** `reports/model_a_v1.json` (committed), containing features, data window, all metrics vs baselines, scikit-learn version, git commit, and creation date.
+- A new version number whenever data or features change.
+- Predictions are written to `predictions` with the model version; the dashboard shows the latest.
+
+## 8. Streamlit dashboard
+
+| Page | Shows | Uses |
+|---|---|---|
+| Home | Counts by status per type, recently updated entries, last sync times | `my_entries`, `sync_runs` |
+| Tracker | Filterable table (Anime / TV / Movies tabs) with covers | `my_entries` + `titles` |
+| Season Forecast | Current-season shows with ≥3 episodes: ep3 score, predicted finale ± test MAE | Model A, `score_trends` |
+| Will I Finish? | Planning list ranked by drop probability, plus global feature importance | Model B, `predictions` |
+| Model Report | Metrics vs baselines, error charts (Streamlit built-in charts) | `reports/*.json` |
+| About & Credits | Credits (AniList, Trakt, Kaggle dataset), TMDB notice, limitations | static |
+| *(Later)* Music | Recent plays, top artists, playlists, theme links | `listening_history`, `song_links` |
+
+## 9. Tech stack
+
+| Tool | Purpose | Status |
+|---|---|---|
+| Python 3.13.5 + venv | Everything | installed |
+| MongoDB Atlas (Free) + Compass | Database + GUI | set up |
+| pymongo 4.18.2 | Python ↔ MongoDB | installed |
+| python-dotenv 1.2.4 | Load secrets from `.env` | installed |
+| requests | Call AniList, Trakt, TMDB, AnimeThemes | Phase 3 |
+| pandas | Data prep, Kaggle CSV chunks | Phase 2 |
+| scikit-learn (+ joblib, included) | Models, metrics, saving models | Phase 6 |
+| Jupyter (VS Code notebooks) | Exploration only | Phase 2 |
+| Streamlit | Dashboard | Phase 9 |
+| pytest | Tests. **New tool:** the standard, simplest Python test runner; needed for section 12 | Phase 3 |
+| ytmusicapi | YouTube Music | Phase 10 |
+
+For each phase, install the latest version, confirm it supports Python 3.13, and pin it in `requirements.txt`.
+
+**Deliberately not used:** Java/JavaFX (dropped from priorities), FastAPI (Streamlit calls Python directly), Docker, LightGBM/XGBoost (scikit-learn is enough), SHAP (global importance first), Spotify (deprecated endpoints, restricted access), Jikan (unofficial; AniList covers it), ODMs like MongoEngine (raw pymongo teaches MongoDB better), schedulers like Airflow (Windows Task Scheduler is enough), the Kaggle CLI (manual download).
+
+## 10. Project structure
+```
+episode-three/
+├── .env                  # secrets (git-ignored)
+├── .env.example          # placeholder keys (committed)
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── docs/SPEC.md          # this document
+├── devlog/NNN-kebab-title.md
+├── episode_three/        # the Python package
+│   ├── __init__.py
+│   ├── config.py         # reads .env
+│   ├── db.py             # MongoClient + get_db()
+│   ├── clients/          # anilist.py, trakt.py, tmdb.py, ytmusic.py, animethemes.py
+│   ├── sync/             # my_anime.py, my_trakt.py, music.py
+│   ├── collect/          # score_trends.py, kaggle_import.py
+│   ├── features/         # model_a.py, model_b.py
+│   └── models/           # train_a.py, train_b.py, evaluate.py, predict.py
+├── scripts/              # entry points: python -m scripts.<name>
+├── app/                  # Streamlit: Home.py + pages/
+├── notebooks/            # exploration only, never imported
+├── tests/  (+ tests/fixtures/*.json saved API responses)
+├── reports/              # model_*_vN.json (committed)
+├── data/                 # raw/processed files (git-ignored)
+└── artifacts/models/     # .joblib files (git-ignored)
+```
+
+**Naming conventions:**
+- Files, functions, and variables: `snake_case`. Constants: `UPPER_CASE`. Classes: `PascalCase` (avoid classes unless needed).
+- Collections: plural `snake_case`.
+- Commit messages: `TASK 0NN: <what>`.
+- Run scripts from the repo root with `python -m scripts.<name>`.
+
+## 11. Build phases
+
+| # | Phase | Goal → definition of done | Nirav can explain afterwards |
+|---|---|---|---|
+| 1 | Foundation (TASK 002) | Python reaches Atlas; package skeleton; sample data removed | `.env` secrets, MongoClient, what counts toward 512 MB |
+| 2 | Risk probes (TASKs 003–004) | Confirm AniList trend coverage; check Kaggle license and size | Why de-risk before building |
+| 3 | Anime tracker | AniList client with rate limiter; idempotent sync of Nirav's list into `titles` + `my_entries`; first tests | GraphQL, rate limiting, upserts and idempotency |
+| 4 | TV/movie tracker | Trakt device auth; sync watched shows, movies, dropped shows | OAuth device flow, normalizing data from two sources |
+| 5 | Model A data | Resumable trend collection; feature pipeline into `model_a_features` | Embedded arrays, aggregation pipelines |
+| 6 | Model A training | Baselines + 3 models; report committed | Regression, MAE, time-based splits, leakage |
+| 7 | Model B data | Kaggle sample into `mal_*`; history/target roles | Chunked processing, anonymization, data terms |
+| 8 | Model B training | Baselines + 3 models; report committed | Classification, ROC-AUC vs PR-AUC, group splits |
+| 9 | Dashboard (**MVP done**) | All MVP pages working | How the UI reads data and models |
+| 10 | Music | History polling, playlists, theme links | Working with unofficial APIs, deduplication without timestamps |
+| 11 | TMDB + TV Model A (experimental) | Posters; TV variant with caveats | Why per-episode TV ratings aren't true snapshots |
+| 12 | Polish | README, diagram, GIF, tests | The whole story in 2 minutes |
+
+## 12. Testing
+- **pytest**, run with `python -m pytest`.
+- **Unit tests (no network):** status normalization, snapshot selection (ep1/ep3/finale), feature functions, history/target splitting, score-scale conversion, rate-limiter wait calculation.
+- **Parsing tests:** saved API responses in `tests/fixtures/` are parsed into our document shapes, so tests never call real APIs.
+- **Integration test:** a write/read/delete round trip against `episode_three_test`, marked so it can be skipped when offline.
+- **Model smoke tests:** load the saved model, predict one row, check the output range.
+- **Evaluation checks:** split disjointness (no shared users, no overlapping seasons) asserted in code.
+
+## 13. Deliverables
+- **README:** problem → pitch → honest "what exists already" → features with screenshots → architecture diagram → how each model works → results table → limitations → setup instructions → credits/attribution.
+- **Architecture diagram:** Mermaid in the README (GitHub renders it, no extra tool).
+- **Results table template:**
+
+| Model | Metric | Baseline B1 | B2 | B3 | Best model | Test result |
+|---|---|---|---|---|---|---|
+
+- **Demo GIF:** about 30 seconds of the dashboard, recorded with ScreenToGif (free, Windows).
+- **Resume line:** *"Built a media tracker with two ML models — predicting an anime season's final score after 3 episodes (MAE [X] vs [Y] baseline) and whether a user will drop a show (ROC-AUC [A] vs [B]) — using MongoDB aggregation pipelines over [N] records and a Streamlit dashboard."*
+
+## 14. Constraints
+- **OPEN:** weekly hours available.
+- **OPEN:** deadlines (exams, placement drives).
+- Recommendation: tell me both, and I'll size the phases to fit, with MVP before your first placement drive.
+
+## 15. How to teach Nirav (verbatim from his preferences)
+From the current brief: *"I'm a complete Python beginner who must understand every decision well enough to explain it in a job interview."*
+
+From the original project brief:
+- "Teach me step by step. Give me ONE small step at a time, explain what each part of the code does in simple words, and wait for me to run it and report back before moving on."
+- "Prefer simple, readable code over clever code. No unnecessary abstractions, classes, or design patterns unless I need them."
+- "When I hit an error, help me understand WHY it happened, not just the fix."
+- "Occasionally ask me a quick question to check I understood a concept (e.g. 'why do we store this as a nested array?')."
+- "Don't introduce any tool or library that isn't in the tech stack below without asking me first and explaining why."
+- "Remind me to commit to Git at the end of each working step, with a sensible commit message."
+- "Don't write the whole project for me. I need to understand everything well enough to explain it in an interview."
+
+*Adaptation now that Claude Code writes the code:* every task's "Teach Nirav" section carries the explanation. The developer comments code in plain English, and Nirav runs the acceptance commands himself.
+
+## 16. Open questions and risks
+
+| # | Question / risk | Recommendation |
+|---|---|---|
+| OPEN-1 | Model B data source | Kaggle sample for MVP (section 4) |
+| OPEN-2 | Do AniList trends go back to 2019 with per-episode scores, and what defines the finale label? | TASK 003 probe. If coverage starts later, shrink the season window. If fewer than ~300 usable shows, collect live snapshots this season and redefine the label |
+| 3 | Kaggle license unclear | TASK 004 checks it. If restrictive, use option (c) with permission from AniList |
+| 4 | AniList limit may change from 30/min | Read `X-RateLimit-Remaining` headers instead of hard-coding |
+| 5 | Atlas 512 MB | Drop sample data now; check `dbStats` after each import |
+| 6 | Atlas pauses after 30 idle days; no backups on Free | Use it regularly; add `mongodump` backups (MongoDB Database Tools) in Phase 12 |
+| 7 / OPEN-7 | ytmusicapi auth: own Google Cloud OAuth client vs deprecated browser cookies | Decide in Phase 10; lean towards OAuth with own client |
+| 8 | AnimeThemes JSON:API removal | Use GraphQL only |
+| 9 | Trakt API and limit changes in 2026 | Pin endpoints in Phase 4; handle 420/429 errors |
+| 10 | TMDB episode ratings are current, not as-of-episode-3 | TV Model A is labelled "experimental" in the README |
+| 11 | MAL 2020 → AniList 2026 shift; score-scale mismatch | State in the limitations section; compare Nirav's predicted vs actual drops over time |
+| 12 | Atlas IP allowlist: home IP changes cause connection timeouts | TASK 002 documents the fix |
+| 13 | Python 3.13 compatibility | Check each library at install time |
