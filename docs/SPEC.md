@@ -1,6 +1,20 @@
-# Episode Three: Project Spec v1.0 (2026-10-04)
+# Episode Three: Project Spec v1.1 (2026-10-04)
 
-> Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version, not silent edits.
+> Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
+
+## Changelog
+
+**v1.1 (2026-10-04)**, after TASK 002:
+1. `mal_user_lists._id` is a prefixed string, `"mal_user:<id>"`. No exceptions to the `_id` convention (§5).
+2. Storage estimate revised: an embedded user-list entry is about 95 B in BSON, so `mal_user_lists` ≈ 95 MB and the project ≈ 145 MB. Measure with `dbStats` right after the import (§5).
+3. Constraints: no weekly-hour cap and no deadline; phases are sized for quality, not speed (§14).
+4. Model A snapshot definitions (ep1, ep3, finale) are **PENDING TASK 003**, because `MediaTrend.episode` is the episode released on that day (§7).
+5. New standing engineering rules: batch writes, timeouts on every network call, resumable long jobs (§5).
+6. Workflow: small commits, one per logical change (§10).
+
+Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 sample dataset dropped in TASK 002.
+
+**v1.0 (2026-10-04):** first version.
 
 ## 1. Goal and positioning
 
@@ -128,6 +142,11 @@
 
 **Conventions:** readable snake_case field names, dates stored as BSON dates in UTC, string `_id`s prefixed with their source so IDs from different sources never collide. Every sync uses upserts keyed on `_id`, so re-running never duplicates.
 
+**Standing engineering rules (v1.1):** round trips from Nirav's network take 0.2–1.4 s (TASK 002), so:
+- Any job that writes more than a few documents uses `insert_many` / `bulk_write`, never one write per document in a loop.
+- Every network call has a timeout.
+- Long jobs are resumable: they skip work already done and log progress (to `sync_runs`, or to files for probes).
+
 ### Collections
 
 **`titles`**: one document per anime, show, or movie. Indexes: `media_type`; `mal_id` (to join with Kaggle data); `(season_year, season)`.
@@ -198,11 +217,11 @@ Status is normalized across sources to: `watching | completed | dropped | planni
  "genres": ["Action", "Adventure", "Drama"], "source_material": "Manga", "mal_score": 9.19, "members": 2248456}
 ```
 ```json
-{"_id": 12345, "split": "train", "n_entries": 143,
+{"_id": "mal_user:12345", "split": "train", "n_entries": 143,
  "entries": [{"anime_id": "mal:5114", "status": "completed", "episodes_watched": 64, "role": "history"},
              {"anime_id": "mal:1535", "status": "dropped",   "episodes_watched": 5,  "role": "target"}]}
 ```
-User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks each entry as feature history or a prediction target (section 7).
+User IDs are Kaggle's numeric IDs, stored as `"mal_user:<id>"` (v1.1); no usernames are ever stored. `role` marks each entry as feature history or a prediction target (section 7).
 
 **`predictions`**: Index: `(model, title_id, created_at desc)`.
 ```json
@@ -215,7 +234,7 @@ User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks ea
 **Later:** `listening_history` (unique index on `dedupe_key`), `playlists` (tracks embedded, `_id` = playlistId), `song_links` (anime ↔ theme songs).
 
 ### Aggregation pipelines we need
-1. **Model A features:** `$unwind` snapshots → `$match` episode ∈ {1, 3} → `$sort` by date → `$group` by (anime, episode) taking `$last` → reshape into one row per anime → `$merge` into `model_a_features`.
+1. **Model A features** (snapshot selection PENDING TASK 003): `$unwind` snapshots → `$match` episode ∈ {1, 3} → `$sort` by date → `$group` by (anime, episode) taking `$last` → reshape into one row per anime → `$merge` into `model_a_features`.
 2. **Model B user history stats:** `$unwind` entries → `$match` role = history → `$group` by user → count, drops, drop rate. Per-genre drop rates join `mal_anime` genres in pandas, to avoid large `$lookup`s and sorts on the free tier.
 3. **Anime global drop rate (training users only):** `$unwind` → `$match` split = train → `$group` by anime_id.
 4. **Dashboard:** status counts per media type (`$group`); planning list joined to latest predictions (`$lookup` with a small pipeline).
@@ -227,13 +246,15 @@ User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks ea
 | `score_trends` (~1,000 × ~8 KB) | ~8 MB |
 | `model_a_features` | <1 MB |
 | `mal_anime` (~6,000 × ~0.5 KB) | ~3 MB |
-| `mal_user_lists` (5,000 users × ~200 entries × ~70 B) | ~70 MB |
+| `mal_user_lists` (5,000 users × ~200 entries × ~95 B) | ~95 MB |
 | `my_entries`, `predictions`, `sync_runs` | ~2 MB |
 | *(later)* `listening_history` (~50 plays/day) | ~6 MB/year |
 | Indexes (~15%) | ~15 MB |
-| **Total** | **~120 MB** of 512 MB |
+| **Total** | **~145 MB** of 512 MB (28%) |
 
-**The sample dataset must be measured and dropped** (TASK 002).
+v1.1: an embedded entry such as `{"anime_id": "mal:5114", "status": "completed", "episodes_watched": 64, "role": "history"}` is about 95 B in BSON, because field names repeat in every entry. Readable names stay (they fit comfortably); shorten them only if usage passes 350 MB. **Measure with `dbStats` right after the Kaggle import.**
+
+The sample dataset was measured (143 MB) and dropped in TASK 002.
 
 **If usage passes 350 MB:** reduce Kaggle users to 3,000 → stop storing tags → move the Kaggle raw data to local CSVs and keep only aggregated features in Atlas → as a last resort, run a local MongoDB Community server for training data.
 
@@ -258,10 +279,10 @@ User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks ea
 
 ### Model A: Episode-3 predictor (regression)
 - **Unit:** one eligible anime season.
-- **Snapshots:**
+- **Snapshots: PENDING TASK 003.** `MediaTrend.episode` is documented as "the episode number of the anime released on this day", and `averageScore`, `popularity` and `inProgress` can all be null. So "the latest record where episode = 3" is probably just episode 3's airing day, not the state before episode 4. TASK 003 measures the real data and proposes exact definitions. The v1.0 draft, kept for reference:
   - `ep1` = latest trend record where episode = 1.
   - `ep3` = latest trend record where episode = 3, i.e. the state just before episode 4 airs.
-- **Label (OPEN-2):** the finale score, i.e. `average_score` in the last trend record recorded while releasing. Store `current_average_score` for analysis only, never as a feature.
+- **Label (OPEN-2, PENDING TASK 003):** the finale score, i.e. `average_score` in the last trend record recorded while releasing. Store `current_average_score` for analysis only, never as a feature.
 - **Features (v1):**
   - `ep3_score`, `ep1_score`, `score_delta_1_3`
   - `ep3_popularity`, `popularity_growth_1_3` (ep3 ÷ ep1), `ep3_in_progress`
@@ -323,7 +344,7 @@ User IDs are Kaggle's numeric IDs; no usernames are ever stored. `role` marks ea
 | MongoDB Atlas (Free) + Compass | Database + GUI | set up |
 | pymongo 4.18.2 | Python ↔ MongoDB | installed |
 | python-dotenv 1.2.4 | Load secrets from `.env` | installed |
-| requests | Call AniList, Trakt, TMDB, AnimeThemes | Phase 3 |
+| requests | Call AniList, Trakt, TMDB, AnimeThemes | installed (TASK 003) |
 | pandas | Data prep, Kaggle CSV chunks | Phase 2 |
 | scikit-learn (+ joblib, included) | Models, metrics, saving models | Phase 6 |
 | Jupyter (VS Code notebooks) | Exploration only | Phase 2 |
@@ -367,6 +388,7 @@ episode-three/
 - Files, functions, and variables: `snake_case`. Constants: `UPPER_CASE`. Classes: `PascalCase` (avoid classes unless needed).
 - Collections: plural `snake_case`.
 - Commit messages: `TASK 0NN: <what>`.
+- Commits are small, one per logical change, and each one is a coherent, working step (v1.1).
 - Run scripts from the repo root with `python -m scripts.<name>`.
 
 ## 11. Build phases
@@ -406,9 +428,8 @@ episode-three/
 - **Resume line:** *"Built a media tracker with two ML models — predicting an anime season's final score after 3 episodes (MAE [X] vs [Y] baseline) and whether a user will drop a show (ROC-AUC [A] vs [B]) — using MongoDB aggregation pipelines over [N] records and a Streamlit dashboard."*
 
 ## 14. Constraints
-- **OPEN:** weekly hours available.
-- **OPEN:** deadlines (exams, placement drives).
-- Recommendation: tell me both, and I'll size the phases to fit, with MVP before your first placement drive.
+- No weekly-hour cap and no deadline (Nirav, 2026-10-04). The project is for his resume, not tied to any placement drive.
+- Phases are sized for quality, not speed: tests in every phase from Phase 3 on, a short results write-up after each model, and no skipped evaluation steps.
 
 ## 15. How to teach Nirav (verbatim from his preferences)
 From the current brief: *"I'm a complete Python beginner who must understand every decision well enough to explain it in a job interview."*
