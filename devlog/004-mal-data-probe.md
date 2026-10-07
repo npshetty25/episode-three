@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-07 to 2026-10-08
 - **Task:** TASK 004 from the instructor
-- **Status:** Done and verified by the developer. **Verdict: PARTIAL (mechanical)**, with a fix that leaves the sample untouched. Waiting on Nirav's acceptance run.
+- **Status:** Done. All 6 acceptance checks passed on Nirav's machine (2026-10-08). **Verdict: PARTIAL (mechanical)**, with a fix that leaves the sample untouched.
 
 ## Summary
 
@@ -36,6 +36,19 @@ Full report: `reports/probe_mal_data.md`.
 | 4 | `python -m pytest -q` | `6 passed` ✅ |
 | 5 | `git status` / `git check-ignore -v` | Clean after commits; `.gitignore:6:data/  data/processed/mal_sample_5k_seed42.parquet` ✅ |
 | 6 | Hash of `sample_user_ids_seed42.csv` | `56d37ec12b3dcfbad03f43531d23e727ca8a6c983a4b551217b8d1433fc3918f` on both runs ✅ |
+
+### Acceptance run by Nirav (PowerShell, 2026-10-08)
+
+| # | Result |
+|---|---|
+| 1 | `git log --oneline -6` lists `1cb5d9e TASK 004: spec v1.2` and `2745bc6 TASK 004: MAL data probe` ✅ |
+| 2 | `Select-String "v1.2"` finds the title (line 1), the changelog (line 7) and the v1.2 sections ✅ |
+| 3 | Probe completed: same numbers as the developer runs, `VERDICT: PARTIAL (...)`, `Runtime: 122 s` ✅ |
+| 4 | `6 passed in 0.65s` ✅ |
+| 5 | Working tree clean, up to date with `origin/master`; `.gitignore:6:data/  data\processed\mal_sample_5k_seed42.parquet` ✅ |
+| 6 | SHA-256 before and after the re-run: `56D37EC12B3DCFBAD03F43531D23E727CA8A6C983A4B551217B8D1433FC3918F`, identical, and the same as the developer runs ✅ |
+
+Japanese titles printed correctly in the VS Code terminal, which confirms `anime.csv` is fine and the earlier garbling was the console.
 
 ### Key numbers
 
@@ -86,5 +99,4 @@ See `reports/probe_mal_data.md`. In short:
 
 ## Next
 
-- Nirav runs acceptance checks 1–6 and pastes the output here.
 - Instructor answers the questions; TASK 005 follows.
