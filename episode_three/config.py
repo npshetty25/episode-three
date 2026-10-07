@@ -38,3 +38,21 @@ def get_mongodb_uri():
             "See .env.example for the format."
         )
     return uri
+
+
+def get_mal_data_dir():
+    """Return the folder holding the Kaggle MyAnimeList 2020 CSV files.
+
+    The data stays outside the repo (it is 2.7 GB and must never be committed).
+    """
+    folder = os.getenv("MAL_DATA_DIR", "").strip()
+    if not folder:
+        raise ConfigError(
+            "MAL_DATA_DIR is missing.\n"
+            "Add a line to the .env file pointing at the folder with animelist.csv:\n"
+            "  MAL_DATA_DIR=C:\\path\\to\\anime-recommendation-database-2020"
+        )
+    path = Path(folder)
+    if not path.is_dir():
+        raise ConfigError(f"MAL_DATA_DIR points to a folder that does not exist: {path}")
+    return path
