@@ -1,8 +1,23 @@
-# Episode Three: Project Spec v1.1 (2026-10-04)
+# Episode Three: Project Spec v1.2 (2026-10-07)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.2 (2026-10-07)**, the instructor's rulings after the TASK 003 probe:
+1. Model A season window: **Fall 2018 → Summer 2026**. Earlier seasons are excluded (no usable daily trend records) (§6).
+2. New eligibility filter: exclude shows whose episode duration is < 10 min (§6).
+3. Trend dates are **JST days**; "has score" means `averageScore > 0` (§4.1, §7).
+4. Marker day M(n) defined (§7).
+5. ep3 and ep1 snapshot definitions, with the `multi_episode_premiere` flag (§7).
+6. **Primary finale label = the last releasing record** (finale-day record), stored with `label_source`. Finale +7 days is a secondary sensitivity label reported in Phase 6 (§7).
+7. Collection method = **option C**: `mediaId_in` batches of ~10, date windows only; every query names only the filters it uses (§4.1, §6).
+8. Risk 4 rewritten: `X-RateLimit-Remaining` does not predict 429s; `Retry-After` is the real protection (§4.1, §16).
+9. Open item for Phase 5: test `airingSchedules` with `mediaId_in` (§16).
+10. Open item: confirm Summer 2026 shows have reached finale + 7 days before counting them (§16).
+11. Model B data decided: the hernan4444 Kaggle dataset for v1, with an optional later time-based test on the svanoo 2022 dataset (§4.6, OPEN-1).
+
+Also updated: §9 pandas, numpy, pyarrow and pytest installed in TASK 004.
 
 **v1.1 (2026-10-04)**, after TASK 002:
 1. `mal_user_lists._id` is a prefixed string, `"mal_user:<id>"`. No exceptions to the `_id` convention (§5).
@@ -81,6 +96,11 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 - **Auth:** none for public data. Nirav's list must be public, or we add OAuth later. No account or key needed for MVP.
 - **Rate limit:** the API is currently degraded and limited to 30 requests per minute as a temporary measure, normally 90. Exceeding it gives a 1-minute timeout, and a separate burst limiter blocks too many requests in a very short period.
   - **Our rule:** one shared helper sleeps about 2.2 seconds between requests (≈27/min), and on HTTP 429 waits for `Retry-After` seconds before retrying.
+  - **v1.2:** responses show `X-RateLimit-Limit: 30`, but 429s also arrive while `X-RateLimit-Remaining` is 20+ (a hidden limiter, TASK 003). `Retry-After` is the real protection; `Remaining` cannot be used to avoid 429s.
+- **Query rules (v1.2, from TASK 003):**
+  - Every query names only the filters it uses. Filters passed as `null` are not ignored: `mediaId_in: null` → HTTP 500, `episode_lesser: null` / `date_greater: null` → HTTP 400.
+  - Paginate with `hasNextPage` only; `pageInfo.total` is a placeholder (always 5000).
+  - Trend `date` values are stamped at 00:00 JST: all day arithmetic uses **JST days**. A record "has a score" only if `averageScore > 0` (each show's first releasing day has 0).
 - **Key queries and fields:**
   - **Nirav's list:** `MediaListCollection(userName, type: ANIME)` → `lists { entries { status progress score startedAt completedAt updatedAt media { id idMal ... } } }`. Entries come in chunks, max 500 per chunk, so loop chunks.
   - **Season listing:** `Page(perPage: 50) { media(season, seasonYear, type: ANIME, format_in: [TV, ONA]) {...} }`. Page allows max 50 entries per page.
@@ -122,12 +142,15 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 - https://www.kaggle.com/hernan4444/anime-recommendation-database-2020 (manual download with a Kaggle account).
 - `animelist.csv` holds every user's anime with score, watching status, and number of episodes watched: 109 million rows covering 17,562 anime and 325,772 users, about 1.9 GB. Users are numeric IDs, not usernames.
 - **Caveat:** it includes adult anime, which we filter out. The license still needs checking on the Kaggle page (Task 004).
+- **Decided for v1 (v1.2):** Kaggle shows License = CC0: Public Domain (Version 7, updated ~2021, update frequency "Never"). The data was scraped from MyAnimeList via Jikan, and MAL's terms restrict aggregation, so: non-commercial use only, never commit raw data or user-level rows, and the README states "not affiliated with MyAnimeList" plus the limitation "2020 snapshot; shows after 2020 are absent". Details: `docs/data-notes/kaggle-mal-2020.md`.
+- **Optional later:** the svanoo "MyAnimeList Dataset" (2022-03-27 snapshot, has status and `last_interaction_date`, ~14 GB) for a time-based test; a small recent AniList sample only after emailing contact@anilist.co.
 
 ### OPEN-1: Model B training data
 - **(a) Kaggle MAL 2020 sample.** No API collection, no terms risk, data already anonymized. Downsides: 2020 data, MAL users rather than AniList users.
 - **(b) Collect AniList user lists.** Fresh data, but conflicts with the no-mass-collection rule unless AniList agrees.
 - **(c) Both:** train on Kaggle, then validate on a small AniList sample (about 300 users) only after emailing contact@anilist.co.
 - **Recommendation: (a) for MVP, (c) as an optional extension.** It also gives a good interview answer: "I read the API terms and designed around them."
+- **Decided (v1.2): (a)**, the hernan4444 Kaggle dataset, for v1. See §4.6 for the later options.
 
 ## 5. MongoDB design
 
@@ -261,9 +284,9 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 ## 6. Data collection plan
 
 - **Model A:**
-  - Seasons Winter 2019 to Summer 2026 (31 seasons).
-  - Eligible shows: format TV or ONA, 8–30 planned episodes, Japan, not adult, popularity of at least 2,000 at the episode-3 snapshot. Roughly 30–40 per season, about 1,000 total.
-  - Requests: about 62 for season listings plus about 3 per anime for trends, so ~3,100 requests at 27/min ≈ **2 hours**.
+  - Seasons **Fall 2018 to Summer 2026 (32 seasons)** (v1.2). Earlier seasons are excluded: releasing trend records are daily only from 2018-03-20, 2017 records are weekly with no popularity, and 2016 has none (TASK 003).
+  - Eligible shows: format TV or ONA, 8–30 planned episodes, **episode duration ≥ 10 min** (v1.2; drops shorts and mini-dramas), Japan, not adult, popularity of at least 2,000 at the episode-3 snapshot. Roughly 30–40 per season; TASK 003 estimates ~820–1,150 usable, about 1,000.
+  - **Collection method (v1.2) = option C:** `mediaTrends(mediaId_in: [~10 ids])` batches with date windows only: release start → M(4), and finale → finale + 7 days. Estimated ~1,300 requests ≈ 50 min at 27/min (+~10 min of 429 waits). It stores the least data, in the spirit of AniList's no-hoarding rule.
   - Collection is resumable: it skips anime already in `score_trends` and logs to `sync_runs`.
   - All of this depends on TASK 003 confirming the trend data exists.
 - **Model B:**
@@ -279,10 +302,16 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 
 ### Model A: Episode-3 predictor (regression)
 - **Unit:** one eligible anime season.
-- **Snapshots: PENDING TASK 003.** `MediaTrend.episode` is documented as "the episode number of the anime released on this day", and `averageScore`, `popularity` and `inProgress` can all be null. So "the latest record where episode = 3" is probably just episode 3's airing day, not the state before episode 4. TASK 003 measures the real data and proposes exact definitions. The v1.0 draft, kept for reference:
-  - `ep1` = latest trend record where episode = 1.
-  - `ep3` = latest trend record where episode = 3, i.e. the state just before episode 4 airs.
-- **Label (OPEN-2, PENDING TASK 003):** the finale score, i.e. `average_score` in the last trend record recorded while releasing. Store `current_average_score` for analysis only, never as a feature.
+- **Snapshots (v1.2, from the TASK 003 probe).** All days are JST days; a record "has a score" when `averageScore > 0`. `MediaTrend.episode` is non-null only on airing days (00:00 JST airings are marked on two consecutive days).
+  - **Marker day M(n)** = the earliest of (a) the JST day of episode n's `airingSchedule.airingAt` and (b) the day of the first trend record with `episode = n`. Taking the earliest keeps snapshots before any reaction to episode n.
+  - **ep3 snapshot** = the latest releasing record dated within **[M(4) − 3, M(4) − 1]** that has a score. Requires **M(3) < M(4)** (excludes premieres that release ep 4 together with ep 3). The 3-day window tolerates short AniList outages.
+  - **ep1 snapshot** = the same rule with M(2): the latest scored releasing record within [M(2) − 3, M(2) − 1], requiring M(1) < M(2). Otherwise the ep1 features are missing and `multi_episode_premiere` = true.
+  - `popularity` and `inProgress` come from the same record as the score.
+- **Label (v1.2):**
+  - **Primary:** `average_score` of the **last releasing record** (the finale-day record). Stored with `label_source`.
+  - **Secondary (sensitivity, reported in Phase 6):** the score at **finale + 7 days**: the nearest scored record within M(final) + 5…+9 (from `releasing: false` records).
+  - Store `current_average_score` for analysis only, never as a feature.
+- **Exclusions:** no ep3 snapshot; no scored label; episode duration < 10 min.
 - **Features (v1):**
   - `ep3_score`, `ep1_score`, `score_delta_1_3`
   - `ep3_popularity`, `popularity_growth_1_3` (ep3 ÷ ep1), `ep3_in_progress`
@@ -345,11 +374,12 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 | pymongo 4.18.2 | Python ↔ MongoDB | installed |
 | python-dotenv 1.2.4 | Load secrets from `.env` | installed |
 | requests | Call AniList, Trakt, TMDB, AnimeThemes | installed (TASK 003) |
-| pandas | Data prep, Kaggle CSV chunks | Phase 2 |
+| pandas 3.0.6 (+ numpy 2.5.3) | Data prep, Kaggle CSV chunks | installed (TASK 004) |
+| pyarrow 25.0.1 | Write/read Parquet samples (fast, typed, compressed) | installed (TASK 004) |
 | scikit-learn (+ joblib, included) | Models, metrics, saving models | Phase 6 |
 | Jupyter (VS Code notebooks) | Exploration only | Phase 2 |
 | Streamlit | Dashboard | Phase 9 |
-| pytest | Tests. **New tool:** the standard, simplest Python test runner; needed for section 12 | Phase 3 |
+| pytest 9.1.1 | Tests. **New tool:** the standard, simplest Python test runner; needed for section 12 | installed (TASK 004) |
 | ytmusicapi | YouTube Music | Phase 10 |
 
 For each phase, install the latest version, confirm it supports Python 3.13, and pin it in `requirements.txt`.
@@ -449,10 +479,12 @@ From the original project brief:
 
 | # | Question / risk | Recommendation |
 |---|---|---|
-| OPEN-1 | Model B data source | Kaggle sample for MVP (section 4) |
-| OPEN-2 | Do AniList trends go back to 2019 with per-episode scores, and what defines the finale label? | TASK 003 probe. If coverage starts later, shrink the season window. If fewer than ~300 usable shows, collect live snapshots this season and redefine the label |
+| OPEN-1 | Model B data source | **Decided (v1.2):** hernan4444 Kaggle dataset for v1 (§4.6) |
+| OPEN-2 | Do AniList trends go back to 2019 with per-episode scores, and what defines the finale label? | **Resolved (v1.2):** GO from Fall 2018 (90% of sampled shows usable); definitions in §7 |
+| OPEN-3 | Does `airingSchedules` accept `mediaId_in` like `mediaTrends`? | Test with 1 request in Phase 5. If not, rely on trend markers (99% within ±1 day of the schedule) |
+| OPEN-4 | Summer 2026 shows may not have reached finale + 7 days | Before counting a Summer 2026 show as usable, confirm finale + 7 days has passed |
 | 3 | Kaggle license unclear | TASK 004 checks it. If restrictive, use option (c) with permission from AniList |
-| 4 | AniList limit may change from 30/min | Read `X-RateLimit-Remaining` headers instead of hard-coding |
+| 4 | AniList limit may change from 30/min | **Rewritten (v1.2):** `X-RateLimit-Remaining` does NOT predict 429s (a hidden limiter fires while it shows 20+). Keep the 2.2 s spacing and honour `Retry-After`; that is the real protection |
 | 5 | Atlas 512 MB | Drop sample data now; check `dbStats` after each import |
 | 6 | Atlas pauses after 30 idle days; no backups on Free | Use it regularly; add `mongodump` backups (MongoDB Database Tools) in Phase 12 |
 | 7 / OPEN-7 | ytmusicapi auth: own Google Cloud OAuth client vs deprecated browser cookies | Decide in Phase 10; lean towards OAuth with own client |
