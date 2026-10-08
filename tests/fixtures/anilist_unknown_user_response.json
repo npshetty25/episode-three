@@ -1,0 +1,22 @@
+{
+ "note": "Real AniList answer for a username that does not exist (TASK 005, 2026-10-08)",
+ "username": "zz-no-such-user-episode-three-probe",
+ "http_status": 404,
+ "body": {
+  "errors": [
+   {
+    "message": "User not found",
+    "status": 404,
+    "locations": [
+     {
+      "line": 1,
+      "column": 29
+     }
+    ]
+   }
+  ],
+  "data": {
+   "MediaListCollection": null
+  }
+ }
+}

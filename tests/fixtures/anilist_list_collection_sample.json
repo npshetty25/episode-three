@@ -1,0 +1,71 @@
+{
+ "_note": "HAND-MADE MediaListCollection answer for tests (not real data). 7 entries in status lists + entry 1003 repeated in a custom list. createdAt 1791449874 = 2026-10-08 08:57:54 UTC (inside the MAL import); 1791900000 = 2026-10-13 (after it).",
+ "MediaListCollection": {
+  "hasNextChunk": false,
+  "user": {"id": 1, "name": "testuser", "mediaListOptions": {"scoreFormat": "POINT_10"}},
+  "lists": [
+   {"name": "Completed", "isCustomList": false, "status": "COMPLETED", "entries": [
+    {"id": 1001, "mediaId": 21, "status": "COMPLETED", "progress": 12, "repeat": 0, "score": 85, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": 2024, "month": 1, "day": 2}, "completedAt": {"year": 2024, "month": 2, "day": 10},
+     "createdAt": 1791449874, "updatedAt": 1791449874,
+     "media": {"id": 21, "idMal": 21, "title": {"romaji": "Show A", "english": "Show A EN", "native": null}, "format": "TV", "status": "FINISHED", "episodes": 12, "duration": 24, "season": "FALL", "seasonYear": 2023,
+      "startDate": {"year": 2023, "month": 10, "day": 1}, "endDate": {"year": 2023, "month": 12, "day": 20}, "genres": ["Action"], "source": "MANGA", "isAdult": false,
+      "averageScore": 80, "meanScore": 81, "popularity": 1000, "siteUrl": "https://anilist.co/anime/21", "coverImage": {"large": "https://example.invalid/21.jpg"}}},
+    {"id": 1003, "mediaId": 23, "status": "COMPLETED", "progress": 24, "repeat": 0, "score": 0, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": null, "month": null, "day": null}, "completedAt": {"year": 2025, "month": null, "day": null},
+     "createdAt": 1791449874, "updatedAt": 1791449874,
+     "media": {"id": 23, "idMal": null, "title": {"romaji": "Show C", "english": null, "native": null}, "format": "TV", "status": "FINISHED", "episodes": 24, "duration": 23, "season": "SPRING", "seasonYear": 2024,
+      "startDate": {"year": 2024, "month": 4, "day": null}, "endDate": {"year": null, "month": null, "day": null}, "genres": ["Drama"], "source": "ORIGINAL", "isAdult": false,
+      "averageScore": 70, "meanScore": 71, "popularity": 500, "siteUrl": "https://anilist.co/anime/23", "coverImage": {"large": null}}}
+   ]},
+   {"name": "Rewatching", "isCustomList": false, "status": "REPEATING", "entries": [
+    {"id": 1002, "mediaId": 22, "status": "REPEATING", "progress": 3, "repeat": 1, "score": 90, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": 2026, "month": 10, "day": null}, "completedAt": {"year": null, "month": null, "day": null},
+     "createdAt": 1791900000, "updatedAt": 1791900000,
+     "media": {"id": 22, "idMal": 22, "title": {"romaji": "Show B", "english": null, "native": null}, "format": "TV", "status": "FINISHED", "episodes": 13, "duration": 24, "season": "WINTER", "seasonYear": 2020,
+      "startDate": {"year": 2020, "month": 1, "day": 5}, "endDate": {"year": 2020, "month": 3, "day": 29}, "genres": ["Comedy"], "source": "LIGHT_NOVEL", "isAdult": false,
+      "averageScore": 75, "meanScore": 76, "popularity": 800, "siteUrl": "https://anilist.co/anime/22", "coverImage": {"large": "https://example.invalid/22.jpg"}}}
+   ]},
+   {"name": "Watching", "isCustomList": false, "status": "CURRENT", "entries": [
+    {"id": 1004, "mediaId": 24, "status": "CURRENT", "progress": 0, "repeat": 0, "score": 0, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": null, "month": null, "day": null}, "completedAt": {"year": null, "month": null, "day": null},
+     "createdAt": 1791449874, "updatedAt": 1791449874,
+     "media": {"id": 24, "idMal": 24, "title": {"romaji": "Show D", "english": "Show D EN", "native": null}, "format": "TV", "status": "RELEASING", "episodes": null, "duration": 24, "season": "FALL", "seasonYear": 2026,
+      "startDate": {"year": 2026, "month": 10, "day": 2}, "endDate": {"year": null, "month": null, "day": null}, "genres": ["Action", "Fantasy"], "source": "MANGA", "isAdult": false,
+      "averageScore": null, "meanScore": null, "popularity": 300, "siteUrl": "https://anilist.co/anime/24", "coverImage": {"large": "https://example.invalid/24.jpg"}}}
+   ]},
+   {"name": "Paused", "isCustomList": false, "status": "PAUSED", "entries": [
+    {"id": 1005, "mediaId": 25, "status": "PAUSED", "progress": 5, "repeat": 0, "score": 0, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": null, "month": null, "day": null}, "completedAt": {"year": null, "month": null, "day": null},
+     "createdAt": 1791900000, "updatedAt": 1791900000,
+     "media": {"id": 25, "idMal": 25, "title": {"romaji": "Show E", "english": null, "native": null}, "format": "ONA", "status": "FINISHED", "episodes": 10, "duration": 20, "season": null, "seasonYear": null,
+      "startDate": {"year": 2022, "month": null, "day": null}, "endDate": {"year": 2022, "month": null, "day": null}, "genres": [], "source": "ORIGINAL", "isAdult": false,
+      "averageScore": 60, "meanScore": 61, "popularity": 200, "siteUrl": "https://anilist.co/anime/25", "coverImage": {"large": null}}}
+   ]},
+   {"name": "Dropped", "isCustomList": false, "status": "DROPPED", "entries": [
+    {"id": 1006, "mediaId": 26, "status": "DROPPED", "progress": 2, "repeat": 0, "score": 40, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": 2025, "month": 6, "day": 1}, "completedAt": {"year": null, "month": null, "day": null},
+     "createdAt": 1791449874, "updatedAt": 1791449874,
+     "media": {"id": 26, "idMal": 26, "title": {"romaji": "Show F", "english": null, "native": null}, "format": "TV", "status": "FINISHED", "episodes": 12, "duration": 24, "season": "SUMMER", "seasonYear": 2025,
+      "startDate": {"year": 2025, "month": 7, "day": 1}, "endDate": {"year": 2025, "month": 9, "day": 20}, "genres": ["Romance"], "source": "MANGA", "isAdult": false,
+      "averageScore": 55, "meanScore": 56, "popularity": 400, "siteUrl": "https://anilist.co/anime/26", "coverImage": {"large": null}}}
+   ]},
+   {"name": "Planning", "isCustomList": false, "status": "PLANNING", "entries": [
+    {"id": 1007, "mediaId": 27, "status": "PLANNING", "progress": 0, "repeat": 0, "score": 0, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": null, "month": null, "day": null}, "completedAt": {"year": null, "month": null, "day": null},
+     "createdAt": 1791900000, "updatedAt": 1791900000,
+     "media": {"id": 27, "idMal": 27, "title": {"romaji": "Show G", "english": null, "native": null}, "format": "MOVIE", "status": "NOT_YET_RELEASED", "episodes": 1, "duration": 110, "season": null, "seasonYear": null,
+      "startDate": {"year": 2027, "month": null, "day": null}, "endDate": {"year": null, "month": null, "day": null}, "genres": ["Drama"], "source": "ORIGINAL", "isAdult": false,
+      "averageScore": null, "meanScore": null, "popularity": 50, "siteUrl": "https://anilist.co/anime/27", "coverImage": {"large": null}}}
+   ]},
+   {"name": "Favourites", "isCustomList": true, "status": null, "entries": [
+    {"id": 1003, "mediaId": 23, "status": "COMPLETED", "progress": 24, "repeat": 0, "score": 0, "private": false, "hiddenFromStatusLists": false,
+     "startedAt": {"year": null, "month": null, "day": null}, "completedAt": {"year": 2025, "month": null, "day": null},
+     "createdAt": 1791449874, "updatedAt": 1791449874,
+     "media": {"id": 23, "idMal": null, "title": {"romaji": "Show C", "english": null, "native": null}, "format": "TV", "status": "FINISHED", "episodes": 24, "duration": 23, "season": "SPRING", "seasonYear": 2024,
+      "startDate": {"year": 2024, "month": 4, "day": null}, "endDate": {"year": null, "month": null, "day": null}, "genres": ["Drama"], "source": "ORIGINAL", "isAdult": false,
+      "averageScore": 70, "meanScore": 71, "popularity": 500, "siteUrl": "https://anilist.co/anime/23", "coverImage": {"large": null}}}
+   ]}
+  ]
+ }
+}

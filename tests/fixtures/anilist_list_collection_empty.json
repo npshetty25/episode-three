@@ -1,0 +1,8 @@
+{
+ "_note": "HAND-MADE MediaListCollection answer for a user whose anime list is empty.",
+ "MediaListCollection": {
+  "hasNextChunk": false,
+  "user": {"id": 2, "name": "emptyuser", "mediaListOptions": {"scoreFormat": "POINT_10"}},
+  "lists": []
+ }
+}
