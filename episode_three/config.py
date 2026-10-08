@@ -40,6 +40,18 @@ def get_mongodb_uri():
     return uri
 
 
+def get_anilist_username():
+    """Return Nirav's AniList username (whose public list the sync reads)."""
+    username = os.getenv("ANILIST_USERNAME", "").strip()
+    if not username:
+        raise ConfigError(
+            "ANILIST_USERNAME is missing.\n"
+            "Add this line to the .env file in the episode-three folder:\n"
+            "  ANILIST_USERNAME=<your AniList username>"
+        )
+    return username
+
+
 def get_mal_data_dir():
     """Return the folder holding the Kaggle MyAnimeList 2020 CSV files.
 
