@@ -31,6 +31,9 @@ def get_client():
             serverSelectionTimeoutMS=10_000,
             # A label that shows up in Atlas logs, so we know which program connected.
             appname="episode-three",
+            # Give dates back with their UTC time zone attached, so a date read from
+            # the database equals the same date built fresh in Python.
+            tz_aware=True,
         )
     return _client
 
