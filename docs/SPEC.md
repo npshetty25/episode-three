@@ -1,8 +1,19 @@
-# Episode Three: Project Spec v1.2 (2026-10-07)
+# Episode Three: Project Spec v1.3 (2026-10-08)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.3 (2026-10-08)**, the instructor's rulings after TASK 004, plus the tracker decision:
+1. Model B data **CLEARED**. TASK 004's PARTIAL is accepted: the Phase 7 importer drops and logs undocumented status codes (0/5/33/55) and duplicate pairs (§4.6).
+2. Adult filter = **OR**: exclude if `Genres` contains "Hentai" OR `Rating` starts with "Rx" (§4.6).
+3. Model B **show-level features come from AniList** for both training and inference anime (fetch ~4,600 training anime via `idMal_in`, ~95 requests, minimal fields). The drop-share feature uses AniList `stats.statusDistribution` for both. The training-user smoothed drop rate is a Phase 8 experiment. Flag: the drop share of currently airing shows is immature (§7).
+4. Known coverage gap: the Kaggle data has no anime after ~2020 (0/10 recent shows present); this is why ruling 3 exists. README limitation (§4.6).
+5. Storage estimate for `mal_user_lists` ≈ 81 MB (mean 170 entries/user) (§5).
+6. 262 TV anime with unknown episode counts are excluded for v1; note it in the Phase 8 report (§4.6).
+7. **Tracker decision:** AniList is Nirav's tracker. Our own anime tracker in MongoDB is NOT allowed (AniList terms, clause 5). MAL was considered and rejected. TV/movies: decided in Phase 4 (§4.1, §5).
+8. Status mapping AniList → MAL training codes (§5).
+9. Entry `origin` = "mal_import" or "anilist", from the real `createdAt` data. Imported entries have stale progress and mostly unset dates; Model B never uses progress or dates (§5).
 
 **v1.2 (2026-10-07)**, the instructor's rulings after the TASK 003 probe:
 1. Model A season window: **Fall 2018 → Summer 2026**. Earlier seasons are excluded (no usable daily trend records) (§6).
@@ -109,6 +120,9 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 - **Terms of use (important):** AniList is free for non-commercial use, prohibits using the API as a backup or data storage service, prohibits hoarding or mass collection of data, and prohibits use within competing services such as list/tracker services, unless they provide significant sustained syncing with AniList. For purely educational projects like school assignments, they say they tend to be lenient on the mass-collection rule.
   - **Design consequences:**
     - AniList stays the source of truth for Nirav's anime. We only *read* and sync it; we never maintain a separate anime list.
+    - **Tracker decision (v1.3).** AniList is Nirav's tracker. Clause 5 of https://docs.anilist.co/guide/terms-of-use prohibits using the API within competing, non-complementary services of the same nature (including anime list/tracker services), for user data and media data. So this app is a **dashboard on top of AniList**: it reads only Nirav's own public list (`MediaListCollection`, no OAuth), never writes to it, never offers tracking to others, stores only fields the app uses, and does not fetch `notes`. Building our own anime tracker in MongoDB is **not allowed**. MAL was considered as the tracker and rejected (its API terms are unverified, and it carries the same "competing service" risk). TV/movies are decided in Phase 4 (AniList's rule does not apply there).
+    - `MediaListCollection` returns the whole list at once, capped at the 11,000 most recently updated entries. Chunked with `chunk`/`perChunk` (max 500) + `hasNextChunk`. Scores are fetched as `score(format: POINT_100)`.
+    - **Unknown username:** HTTP 404, `errors: [{"message": "User not found"}]`, `data.MediaListCollection: null` (TASK 005); the sync turns it into a clear error.
     - Model A collection stays modest (about 1,000 shows).
     - We do not mass-collect other users' lists (see OPEN-1).
     - The app name never contains "AniList".
@@ -151,6 +165,10 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 - **(c) Both:** train on Kaggle, then validate on a small AniList sample (about 300 users) only after emailing contact@anilist.co.
 - **Recommendation: (a) for MVP, (c) as an optional extension.** It also gives a good interview answer: "I read the API terms and designed around them."
 - **Decided (v1.2): (a)**, the hernan4444 Kaggle dataset, for v1. See §4.6 for the later options.
+- **CLEARED (v1.3).** TASK 004's PARTIAL is accepted: the Phase 7 importer drops and logs rows with undocumented status codes (0, 5, 33, 55; 540 rows) and duplicate `(user_id, anime_id)` pairs.
+  - **Adult filter = OR:** exclude an anime if `Genres` contains "Hentai" OR `Rating` starts with "Rx".
+  - **262 TV anime with unknown episode counts are excluded** for v1; note it in the Phase 8 report.
+  - **Coverage gap:** the data has no anime after ~2020 (max MAL_ID 48,492; 0/10 recent shows present). README limitation. This is why Model B's show-level features come from AniList (§7).
 
 ## 5. MongoDB design
 
@@ -195,21 +213,29 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 ```
 TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs stored in `trakt_ids`. Values above are illustrative.
 
-**`my_entries`**: Nirav's tracker, one document per title. References `titles` via `title_id`. Index: `(media_type, status)` for dashboard filters.
+**`my_entries`**: a read-only copy of Nirav's AniList list entries (v1.3; AniList is the tracker), one document per AniList list entry. References `titles` via `title_id`. Indexes: `title_id`, `mal_status_code`. Entries deleted on AniList are deleted here on the next sync. Documents are only written when their content changed, so a re-sync of unchanged data writes nothing.
 ```json
 {
-  "_id": "anilist:154587",
+  "_id": "anilist_entry:123456789",
+  "username": "npshetty25",
   "title_id": "anilist:154587",
-  "media_type": "anime",
-  "status": "completed",
+  "anilist_status": "COMPLETED",
+  "mal_status_code": 2,
+  "repeating": false,
   "progress": 28,
-  "my_score": 95,
-  "started_at": {"$date": "2024-01-02T00:00:00Z"},
-  "completed_at": {"$date": "2024-02-10T00:00:00Z"},
-  "source_updated_at": {"$date": "2024-02-10T18:22:00Z"},
-  "synced_at": {"$date": "2026-10-05T10:00:00Z"}
+  "score_100": 95,
+  "started_at": {"year": 2024, "month": 1, "day": null},
+  "completed_at": null,
+  "created_at": {"$date": "2026-10-08T08:57:54Z"},
+  "updated_at": {"$date": "2026-10-08T08:57:54Z"},
+  "origin": "mal_import",
+  "synced_at": {"$date": "2026-10-08T12:00:00Z"}
 }
 ```
+- **Status mapping (v1.3)** AniList → MAL training codes: CURRENT → 1, COMPLETED → 2, REPEATING → 2 (`repeating: true`), PAUSED → 3, DROPPED → 4, PLANNING → 6.
+- `score_100` is `null` when unscored (AniList returns 0). `started_at`/`completed_at` keep AniList's FuzzyDate parts (any may be null) or are `null` when entirely unset; that is normal, not an error.
+- **`origin` (v1.3):** "mal_import" if the entry was created before `MAL_IMPORT_CUTOFF` (2026-10-08 10:00 UTC; all 139 imported entries share `createdAt` 2026-10-08 08:57:54 UTC), else "anilist". Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
+- `sync_runs` (one per sync): `_id` "sync:anilist:<UTC ISO time>", job, username, started_at, finished_at, requests_used, counts (fetched, inserted, modified, unchanged, deleted, by_status, titles).
 Status is normalized across sources to: `watching | completed | dropped | planning | paused | repeating`.
 
 **`score_trends`**: time-series snapshots for Model A, stored as **one document per anime with an embedded array**. The array is naturally bounded (about 90–200 daily records while airing), so embedding is safe and lets one read return a show's whole history. Index: `(season_year, season)`.
@@ -269,11 +295,11 @@ User IDs are Kaggle's numeric IDs, stored as `"mal_user:<id>"` (v1.1); no userna
 | `score_trends` (~1,000 × ~8 KB) | ~8 MB |
 | `model_a_features` | <1 MB |
 | `mal_anime` (~6,000 × ~0.5 KB) | ~3 MB |
-| `mal_user_lists` (5,000 users × ~200 entries × ~95 B) | ~95 MB |
+| `mal_user_lists` (5,000 users × ~170 entries × ~95 B; v1.3, measured mean 170) | ~81 MB |
 | `my_entries`, `predictions`, `sync_runs` | ~2 MB |
 | *(later)* `listening_history` (~50 plays/day) | ~6 MB/year |
 | Indexes (~15%) | ~15 MB |
-| **Total** | **~145 MB** of 512 MB (28%) |
+| **Total** | **~131 MB** of 512 MB (26%) (v1.3; was ~145 MB) |
 
 v1.1: an embedded entry such as `{"anime_id": "mal:5114", "status": "completed", "episodes_watched": 64, "role": "history"}` is about 95 B in BSON, because field names repeat in every entry. Readable names stay (they fit comfortably); shorten them only if usage passes 350 MB. **Measure with `dbStats` right after the Kaggle import.**
 
@@ -333,8 +359,11 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 - **History/target split:** each user's entries are randomly split 80% history / 20% target (seed 42). Features come only from history; rows are targets.
 - **Features:**
   - **User:** history drop rate, number of history entries, smoothed drop rate for this anime's genres, average episode count of completed shows.
-  - **Anime:** episodes, source, genres (multi-hot), community score, members (log scale), global drop rate from training users.
-- **Leakage rules:** user features never see that user's target entries; global drop rates use training users only.
+  - **Anime (v1.3): from AniList for BOTH training and inference anime.** Map the ~4,600 training anime with `idMal_in` (~95 requests, minimal fields): episodes, format, source, genres (multi-hot), average score (0–100), popularity (log scale), and the **drop share** from `stats.statusDistribution` (DROPPED / (COMPLETED + DROPPED)). Reason: the Kaggle data has no anime after ~2020, so `anime.csv` cannot describe Nirav's current shows; using one source for both keeps training and inference consistent.
+  - **Flag:** the drop share of currently airing shows is immature (few people have finished or dropped yet).
+  - **Phase 8 experiment:** a training-user smoothed drop rate `(drops + k × global) / (n + k)`, k ≈ 10, computed from training users only.
+  - `statusDistribution` shape (TASK 005): a list of `{status, amount}` for CURRENT, PLANNING, COMPLETED, DROPPED and PAUSED. It can be selected inside `MediaListCollection` without a complexity error.
+- **Leakage rules:** user features never see that user's target entries; global drop rates use training users only. Same-row `rating`/`watched_episodes` are never features.
 - **Split:** by user (`GroupShuffleSplit`), 70/15/15 train/validation/test. No user appears in two splits.
 - **Baselines:** B1 the anime's global drop rate; B2 the user's history drop rate; B3 logistic regression on both.
 - **Models:** LogisticRegression, RandomForestClassifier, HistGradientBoostingClassifier.
