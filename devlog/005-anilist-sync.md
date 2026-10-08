@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-08
 - **Task:** TASK 005 from the instructor
-- **Status:** Built and verified by the developer (offline suite, live test, test-DB sync). Waiting on Nirav's acceptance run, including the first sync into `episode_three` and comparing counts with his AniList profile.
+- **Status:** Done. Acceptance checks 1–3, 5 and 6 passed on Nirav's machine (2026-10-08). Check 4 synced 139 entries into `episode_three`; the profile-page comparison is awaiting Nirav's confirmation.
 
 ## Summary
 
@@ -34,6 +34,19 @@ The sync is idempotent: a second run reports **0 inserted, 0 modified, 0 deleted
 | `sync_runs` | One document per run; the last run shows `inserted 0, modified 0, unchanged 139` |
 | Indexes | `_id_`, `title_id_1`, `mal_status_code_1` |
 | `python scripts\check_db.py` | **Before: 0.00 MB.** After the test sync: `episode_three_test` 0.24 MB |
+
+### Acceptance run by Nirav (PowerShell, 2026-10-08)
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `python -m pytest -q` | `25 passed, 1 deselected in 1.56s` ✅ |
+| 2 | `python -m pytest -m live -q` | `1 passed, 25 deselected in 80.62s` ✅ |
+| 3 | `sync_anilist.py --test` ×2 | Run 1: entries inserted 0 / modified 0 / unchanged 139 / deleted 0; titles modified 1 (a score/popularity change on AniList since the developer's run). Run 2: **entries 0/0/139/0 and titles 0 modified** ✅ |
+| 4 | `sync_anilist.py` | `episode_three`: **inserted 139**; COMPLETED 73, CURRENT 13, DROPPED 3, PAUSED 1, PLANNING 49. Comparison with anilist.co/user/npshetty25: awaiting confirmation |
+| 5 | `check_db.py` | Before 0.00 MB → after: `episode_three` 0.19 MB, `episode_three_test` 0.29 MB, **total 0.48 MB (0.1%)** ✅ |
+| 6 | `git status` / `git log -10` | Clean, up to date; `7cdb14b TASK 005: spec v1.3` and all 9 sync commits listed ✅ |
+
+**Total AniList requests for the task: 9** (developer 5 + Nirav 4) of the 10 budgeted.
 
 ### Counts by status (AniList, 2026-10-08)
 
@@ -105,5 +118,5 @@ Nirav's acceptance runs add 4 (`--test` ×2, live test, real sync), for **9 in t
 
 ## Next
 
-- Nirav runs acceptance checks 1–6 and compares by_status with anilist.co/user/npshetty25.
+- Nirav confirms by_status matches anilist.co/user/npshetty25.
 - Nirav fixes the 14 stale Watching/Paused entries on AniList himself (`--stale` lists them).
