@@ -110,6 +110,15 @@ Nirav's acceptance runs add 4 (`--test` ×2, live test, real sync), for **9 in t
 3. **`statusDistribution` works inside `MediaListCollection`.** Should Phase 7/8 fetch drop shares for Nirav's own titles in the same sync request (0 extra requests), or keep stats out of the sync as now?
 4. **`hiddenFromStatusLists` and `private` are fetched but not stored.** Both are 0 for Nirav; confirm they aren't needed.
 
+## Follow-up (2026-10-09): stale-report rule changed (deviation from the task text)
+
+- **Problem:** the task said to list CURRENT/PAUSED entries that are `origin = "mal_import"` OR older than 180 days. `origin` never changes, so after Nirav fixes the 14 entries on AniList, `--stale` would still list all 14.
+- **Change (Nirav approved):** an imported entry is listed only while it is untouched, meaning `updated_at` is within `IMPORT_EDIT_GRACE_SECONDS = 60` of `created_at`. The 180-day rule is unchanged.
+- **Effect on current data:** One Piece was edited about 2.5 minutes after the import (`updated_at` 09:00:21 vs `created_at` 08:57:54), so the report should now show **13** entries, not 14 (not yet confirmed against the database; a DNS timeout interrupted my check).
+- 26 offline tests pass (1 new). Commits: code + script, then test.
+- **Phase 4 decision (Nirav):** own TV/movie tracker with TMDB.
+- **Check 4 (profile counts vs AniList)** is still waiting for Nirav to look at his profile page.
+
 ## Teach Nirav (covered in the chat)
 
 1. Upsert and idempotency: why a second sync changes nothing, and how fixed `_id`s make that possible.
