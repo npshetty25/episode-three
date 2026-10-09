@@ -130,3 +130,16 @@ def test_stale_entries_and_missing_dates():
     assert [(row["status"], row["title"]) for row in stale] == [("CURRENT", "Show D EN"), ("PAUSED", "anilist:25")]
     assert stale[1]["reason"] == "not updated in 180 days"
     assert anilist_sync.count_without_dates(docs) == 3
+
+
+def test_imported_entry_leaves_the_stale_report_once_edited():
+    docs = list(sample_docs().values())
+    show_d = next(d for d in docs if d["_id"] == "anilist_entry:1004")  # imported CURRENT, untouched
+    recent = show_d["created_at"] + timedelta(days=1)
+    now = recent + timedelta(days=2)  # far less than 180 days after the edit
+    assert [r["title"] for r in anilist_sync.stale_entries([show_d], {}, now)] == ["anilist:24"]
+    assert anilist_sync.untouched_import(show_d) is True
+
+    edited = dict(show_d, updated_at=show_d["created_at"] + timedelta(seconds=147))  # like One Piece
+    assert anilist_sync.untouched_import(edited) is False
+    assert anilist_sync.stale_entries([edited], {}, now) == []
