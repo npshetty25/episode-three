@@ -26,8 +26,8 @@ def print_stale(database, username):
     entries = list(database["my_entries"].find({"username": username}))
     titles = {t["_id"]: t for t in database["titles"].find({"_id": {"$in": [e["title_id"] for e in entries]}})}
     stale = anilist_sync.stale_entries(entries, titles, datetime.now(timezone.utc))
-    print(f"\nWatching/Paused entries to check on AniList ({len(stale)}): imported from MAL, "
-          f"or not updated in {anilist_sync.STALE_AFTER_DAYS} days")
+    print(f"\nWatching/Paused entries to check on AniList ({len(stale)}): imported from MAL and not edited "
+          f"since, or not updated in {anilist_sync.STALE_AFTER_DAYS} days")
     for row in stale:
         episodes = row["episodes"] if row["episodes"] is not None else "?"
         print(f"  {row['status']:<8} {row['progress']:>5}/{episodes:<5} {row['title'][:55]}  ({row['reason']})")

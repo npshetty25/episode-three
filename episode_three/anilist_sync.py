@@ -50,6 +50,10 @@ MAL_IMPORT_CUTOFF = datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc)
 
 STALE_AFTER_DAYS = 180
 
+# An imported entry still counts as untouched if it was updated within this many seconds of
+# its creation. After Nirav edits it on AniList, updated_at moves later and it leaves the report.
+IMPORT_EDIT_GRACE_SECONDS = 60
+
 
 # --- Fetching --------------------------------------------------------------
 
@@ -249,15 +253,25 @@ def sync(db, username, chunks=None):
 
 # --- Reports ---------------------------------------------------------------
 
+def untouched_import(doc):
+    """True for an imported entry that has not been edited on AniList since the import."""
+    if doc["origin"] != "mal_import":
+        return False
+    created, updated = doc["created_at"], doc["updated_at"]
+    if created is None or updated is None:
+        return True
+    return (updated - created).total_seconds() <= IMPORT_EDIT_GRACE_SECONDS
+
+
 def stale_entries(entry_docs, titles_by_id, now, days=STALE_AFTER_DAYS):
-    """CURRENT/PAUSED entries that are imported or not updated for `days` days."""
+    """CURRENT/PAUSED entries that are untouched imports, or not updated for `days` days."""
     cutoff = now - timedelta(days=days)
     stale = []
     for doc in entry_docs:
         if doc["anilist_status"] not in ("CURRENT", "PAUSED"):
             continue
         old = doc["updated_at"] is not None and doc["updated_at"] < cutoff
-        if doc["origin"] == "mal_import" or old:
+        if untouched_import(doc) or old:
             title = titles_by_id.get(doc["title_id"], {})
             names = title.get("title") or {}
             stale.append({
@@ -267,7 +281,7 @@ def stale_entries(entry_docs, titles_by_id, now, days=STALE_AFTER_DAYS):
                 "episodes": title.get("episodes"),
                 "origin": doc["origin"],
                 "updated_at": doc["updated_at"],
-                "reason": "imported" if doc["origin"] == "mal_import" else f"not updated in {days} days",
+                "reason": "imported, not edited since" if untouched_import(doc) else f"not updated in {days} days",
             })
     return sorted(stale, key=lambda row: (row["status"], row["title"].lower()))
 
