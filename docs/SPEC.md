@@ -1,8 +1,15 @@
-# Episode Three: Project Spec v1.3 (2026-10-08)
+# Episode Three: Project Spec v1.4 (2026-10-10)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.4 (2026-10-10)**, the instructor's rulings after the TASK 006 terms check:
+1. **TMDB rejected.** Its API terms (https://www.themoviedb.org/api-terms-of-use) prohibit use *"in connection with, including for training, a machine learning (ML) or artificial intelligence (AI) based Application"*; Episode Three is an ML application (§4.3).
+2. **Phase 11's TMDB-based TV Model A is dropped** (§2, §11, §16).
+3. **Trakt rejected** for Phase 4: free accounts are limited to 250 watchlist items and (since July 2026) one connected community app, the limits keep changing, and OAuth with refresh tokens adds work (§4.2). The TV/movie approach follows in a revised TASK 006: **TV via TVMaze, movies as minimal manual entries**; our database is their source of truth, so backups are needed from Phase 4.
+4. **`--stale` rule deviation (TASK 005):** an imported entry is listed only while `updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS` (60), i.e. until it is edited on AniList. **The 180-day rule still applies** to every CURRENT/PAUSED entry, imported or not (confirmed in code and by a test) (§5).
+5. **AniList sync safety (TASK 006 Part C):** AniList entry documents carry `source: "anilist"`; the sync reads and deletes **only** documents matching `source = "anilist"` AND `username`, so manual TV/movie entries in `my_entries` can never be deleted by it. `synced_at` is renamed `content_changed_at` (last time the content actually changed) on AniList entries and titles (§5).
 
 **v1.3 (2026-10-08)**, the instructor's rulings after TASK 004, plus the tracker decision:
 1. Model B data **CLEARED**. TASK 004's PARTIAL is accepted: the Phase 7 importer drops and logs undocumented status codes (0/5/33/55) and duplicate pairs (§4.6).
@@ -68,14 +75,14 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 
 **MVP features:**
 1. Anime tracker synced from Nirav's AniList account.
-2. TV and movie tracker synced from Nirav's Trakt account.
+2. TV and movie tracker. *(v1.4: our own tracker, not Trakt; TV metadata via TVMaze, movies as minimal manual entries; details in the revised TASK 006.)*
 3. Model A (anime only), trained and evaluated against baselines.
 4. Model B (anime only), trained and evaluated against baselines.
 5. Streamlit dashboard: Home, Tracker, Season Forecast, Will I Finish?, Model Report, About & Credits.
 
 **Later features (after MVP):**
 - YouTube Music: listening history, playlist sync, anime theme-song links, "you replay this opening but haven't watched the show."
-- TMDB enrichment (posters, episode ratings) and an experimental Model A for TV shows.
+- ~~TMDB enrichment (posters, episode ratings) and an experimental Model A for TV shows.~~ **Dropped in v1.4** (TMDB's terms prohibit use with ML/AI applications).
 - Synced lyrics for the current song.
 
 **Out of scope:** Java/JavaFX, desktop widget, FastAPI service, Spotify, public deployment, multi-user accounts, survival analysis, writing data back to AniList or Trakt.
@@ -92,12 +99,12 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 | Feature | On screen | What it does |
 |---|---|---|
 | Anime sync | "Last synced" time on Home | Pulls Nirav's AniList list and upserts it into MongoDB |
-| TV/movie sync | Same | Pulls Trakt watched history and dropped shows |
+| TV/movie tracker | Same | *v1.4: hand-entered entries (TV via TVMaze, movies minimal); not Trakt* |
 | Tracker | Table with filters (type, status, year) and cover images | Shows all entries in one place |
 | Season Forecast | Current-season anime with at least 3 aired episodes: episode-3 score, predicted finale score ± typical error | Model A |
 | Will I Finish? | Nirav's planning list ranked by drop probability | Model B |
 | Model Report | Metrics vs baselines, error charts | Reads committed evaluation reports |
-| About & Credits | Data-source credits, TMDB notice, limitations | Satisfies attribution terms |
+| About & Credits | Data-source credits, limitations (v1.4: no TMDB notice; TMDB not used) | Satisfies attribution terms |
 | *(Later)* Music | Recent plays, top artists, playlists, theme-song links | YouTube Music and AnimeThemes |
 
 ## 4. Data sources
@@ -127,7 +134,8 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
     - We do not mass-collect other users' lists (see OPEN-1).
     - The app name never contains "AniList".
 
-### 4.2 Trakt (TV and movies: Nirav's history)
+### 4.2 Trakt (TV and movies: Nirav's history): **REJECTED (v1.4)**
+- **Why rejected:** free accounts are limited to 250 watchlist items and, since July 2026, one connected community app; the limits keep changing; OAuth with refresh tokens adds work. The v1.0 notes below are kept for reference only.
 - **Base URL:** `https://api.trakt.tv`. Headers: `trakt-api-version: 2`, `trakt-api-key: <client_id>`, `Authorization: Bearer <token>`. Docs: https://trakt.docs.apiary.io
 - **Auth:** OAuth 2.0 device flow: request a device code from /oauth/device/code, then poll /oauth/device/token, the flow intended for TV, console, and CLI apps.
 - **Accounts to create:** a Trakt account and an API app (gives client ID and secret, stored in `.env`).
@@ -135,7 +143,9 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
 - **Rate limit:** a Trakt GitHub issue this week cites 500 unauthenticated GET requests per 5 minutes. Authenticated limits are in the docs. We make only a handful of calls, but still handle HTTP 429.
 - **Caveat:** Trakt is changing account limits in 2026. Free accounts get a bigger watchlist of 250 instead of 100. Watch history isn't affected for our scale.
 
-### 4.3 TMDB (later: posters, TV episode ratings)
+### 4.3 TMDB (later: posters, TV episode ratings): **REJECTED (v1.4)**
+- **Why rejected:** TMDB's API terms (https://www.themoviedb.org/api-terms-of-use) prohibit using the TMDB APIs or TMDB Content *"in connection with, including for training, a machine learning (ML) or artificial intelligence (AI) based Application"*. Episode Three is an ML application, so TMDB is not used anywhere: no tracker metadata and no TV model. (TASK 006 terms check; the pages were read via search extracts because Nirav's ISP blocks themoviedb.org at DNS level and the site serves a bot challenge to scripts.)
+- The v1.0 notes below are kept for reference only.
 - **Base URL:** `https://api.themoviedb.org/3`. Auth: API Read Access Token as a Bearer header. Account and API key application required.
 - **Endpoint:** `GET /tv/{series_id}/season/{season_number}`, whose response includes episodes with `vote_average` and `vote_count`.
 - **Rate limit:** TMDB disabled its legacy limits in 2019 but still has upper limits somewhere around 40 requests per second, and asks you to respect 429s.
@@ -211,12 +221,13 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
   "fetched_at": {"$date": "2026-10-05T10:00:00Z"}
 }
 ```
-TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs stored in `trakt_ids`. Values above are illustrative.
+TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs stored in `trakt_ids`. Values above are illustrative. *(v1.4: TMDB and Trakt are rejected; TV/movie ID formats come with the revised TASK 006.)*
 
-**`my_entries`**: a read-only copy of Nirav's AniList list entries (v1.3; AniList is the tracker), one document per AniList list entry. References `titles` via `title_id`. Indexes: `title_id`, `mal_status_code`. Entries deleted on AniList are deleted here on the next sync. Documents are only written when their content changed, so a re-sync of unchanged data writes nothing.
+**`my_entries`**: a read-only copy of Nirav's AniList list entries (v1.3; AniList is the tracker), one document per AniList list entry. From v1.4 it also holds hand-entered TV/movie entries (`source: "manual"`). References `titles` via `title_id`. Indexes: `title_id`, `mal_status_code`. Entries deleted on AniList are deleted here on the next sync. Documents are only written when their content changed, so a re-sync of unchanged data writes nothing.
 ```json
 {
   "_id": "anilist_entry:123456789",
+  "source": "anilist",
   "username": "npshetty25",
   "title_id": "anilist:154587",
   "anilist_status": "COMPLETED",
@@ -229,9 +240,12 @@ TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs
   "created_at": {"$date": "2026-10-08T08:57:54Z"},
   "updated_at": {"$date": "2026-10-08T08:57:54Z"},
   "origin": "mal_import",
-  "synced_at": {"$date": "2026-10-08T12:00:00Z"}
+  "content_changed_at": {"$date": "2026-10-08T12:00:00Z"}
 }
 ```
+- **Deletion scope (v1.4):** the AniList sync reads and deletes only documents matching `source = "anilist"` AND `username` (`stored_entries_filter`, `entry_deletion_filter`). Manual entries can never match; a pure-function test proves it.
+- **`content_changed_at` (v1.4, was `synced_at`):** the last time the document's content actually changed. Unchanged documents are not rewritten. Used on AniList entries and AniList titles; existing documents were migrated by `scripts/migrate_anilist_docs.py`.
+- **`--stale` report (v1.4):** lists CURRENT/PAUSED entries that are either (a) imported and not edited since (`updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS`, 60 s), or (b) not updated for 180 days. Rule (b) applies to all entries, imported or not.
 - **Status mapping (v1.3)** AniList → MAL training codes: CURRENT → 1, COMPLETED → 2, REPEATING → 2 (`repeating: true`), PAUSED → 3, DROPPED → 4, PLANNING → 6.
 - `score_100` is `null` when unscored (AniList returns 0). `started_at`/`completed_at` keep AniList's FuzzyDate parts (any may be null) or are `null` when entirely unset; that is normal, not an error.
 - **`origin` (v1.3):** "mal_import" if the entry was created before `MAL_IMPORT_CUTOFF` (2026-10-08 10:00 UTC; all 139 imported entries share `createdAt` 2026-10-08 08:57:54 UTC), else "anilist". Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
@@ -391,7 +405,7 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 | Season Forecast | Current-season shows with ≥3 episodes: ep3 score, predicted finale ± test MAE | Model A, `score_trends` |
 | Will I Finish? | Planning list ranked by drop probability, plus global feature importance | Model B, `predictions` |
 | Model Report | Metrics vs baselines, error charts (Streamlit built-in charts) | `reports/*.json` |
-| About & Credits | Credits (AniList, Trakt, Kaggle dataset), TMDB notice, limitations | static |
+| About & Credits | Credits (AniList, Kaggle dataset, TV source from the revised TASK 006), limitations | static |
 | *(Later)* Music | Recent plays, top artists, playlists, theme links | `listening_history`, `song_links` |
 
 ## 9. Tech stack
@@ -457,14 +471,14 @@ episode-three/
 | 1 | Foundation (TASK 002) | Python reaches Atlas; package skeleton; sample data removed | `.env` secrets, MongoClient, what counts toward 512 MB |
 | 2 | Risk probes (TASKs 003–004) | Confirm AniList trend coverage; check Kaggle license and size | Why de-risk before building |
 | 3 | Anime tracker | AniList client with rate limiter; idempotent sync of Nirav's list into `titles` + `my_entries`; first tests | GraphQL, rate limiting, upserts and idempotency |
-| 4 | TV/movie tracker | Trakt device auth; sync watched shows, movies, dropped shows | OAuth device flow, normalizing data from two sources |
+| 4 | TV/movie tracker | *v1.4: our own tracker (TV via TVMaze, movies as minimal manual entries), with export/restore backups; revised TASK 006* | Source of truth and backups; scoped deletes |
 | 5 | Model A data | Resumable trend collection; feature pipeline into `model_a_features` | Embedded arrays, aggregation pipelines |
 | 6 | Model A training | Baselines + 3 models; report committed | Regression, MAE, time-based splits, leakage |
 | 7 | Model B data | Kaggle sample into `mal_*`; history/target roles | Chunked processing, anonymization, data terms |
 | 8 | Model B training | Baselines + 3 models; report committed | Classification, ROC-AUC vs PR-AUC, group splits |
 | 9 | Dashboard (**MVP done**) | All MVP pages working | How the UI reads data and models |
 | 10 | Music | History polling, playlists, theme links | Working with unofficial APIs, deduplication without timestamps |
-| 11 | TMDB + TV Model A (experimental) | Posters; TV variant with caveats | Why per-episode TV ratings aren't true snapshots |
+| ~~11~~ | ~~TMDB + TV Model A (experimental)~~ | **Dropped in v1.4** (TMDB terms prohibit ML/AI use) | Why reading API terms is part of the engineering |
 | 12 | Polish | README, diagram, GIF, tests | The whole story in 2 minutes |
 
 ## 12. Testing
@@ -518,8 +532,10 @@ From the original project brief:
 | 6 | Atlas pauses after 30 idle days; no backups on Free | Use it regularly; add `mongodump` backups (MongoDB Database Tools) in Phase 12 |
 | 7 / OPEN-7 | ytmusicapi auth: own Google Cloud OAuth client vs deprecated browser cookies | Decide in Phase 10; lean towards OAuth with own client |
 | 8 | AnimeThemes JSON:API removal | Use GraphQL only |
-| 9 | Trakt API and limit changes in 2026 | Pin endpoints in Phase 4; handle 420/429 errors |
-| 10 | TMDB episode ratings are current, not as-of-episode-3 | TV Model A is labelled "experimental" in the README |
+| 9 | Trakt API and limit changes in 2026 | **Closed (v1.4):** Trakt rejected |
+| 10 | TMDB episode ratings are current, not as-of-episode-3 | **Closed (v1.4):** TMDB rejected, TV Model A dropped |
+| 14 | Nirav's ISP (Jio) blocks some sites at DNS level (themoviedb.org); Atlas DNS timeouts seen too | Encrypted DNS (DoH) on Windows; no IP pinning in code |
+| 15 | Nirav's IP changes often (Atlas refuses with `TLSV1_ALERT_INTERNAL_ERROR`) | Add the current IP in Atlas → IP Access List when it happens; `check_db` explains the error |
 | 11 | MAL 2020 → AniList 2026 shift; score-scale mismatch | State in the limitations section; compare Nirav's predicted vs actual drops over time |
 | 12 | Atlas IP allowlist: home IP changes cause connection timeouts | TASK 002 documents the fix |
 | 13 | Python 3.13 compatibility | Check each library at install time |
