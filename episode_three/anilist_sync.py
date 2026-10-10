@@ -114,13 +114,18 @@ def entry_origin(created_at_seconds, cutoff=MAL_IMPORT_CUTOFF):
     return "anilist"
 
 
-def to_entry_doc(entry, username, synced_at):
-    """One AniList list entry -> one my_entries document."""
+def to_entry_doc(entry, username, changed_at):
+    """One AniList list entry -> one my_entries document.
+
+    `changed_at` is stored as content_changed_at. It is only written when the
+    content really changed (see plan_changes), so it means "last real change".
+    """
     status = entry["status"]
     if status not in STATUS_TO_MAL_CODE:
         raise ValueError(f"Unknown AniList status {status!r} on entry {entry['id']}")
     return {
         "_id": f"anilist_entry:{entry['id']}",
+        "source": "anilist",  # the sync may only ever delete documents with this source
         "username": username,
         "title_id": f"anilist:{entry['mediaId']}",
         "anilist_status": status,
@@ -133,11 +138,11 @@ def to_entry_doc(entry, username, synced_at):
         "created_at": unix_to_datetime(entry["createdAt"]),
         "updated_at": unix_to_datetime(entry["updatedAt"]),
         "origin": entry_origin(entry["createdAt"]),
-        "synced_at": synced_at,
+        "content_changed_at": changed_at,
     }
 
 
-def to_title_doc(media, synced_at):
+def to_title_doc(media, changed_at):
     """AniList media -> one titles document (only fields the app uses; no stats yet)."""
     return {
         "_id": f"anilist:{media['id']}",
@@ -162,18 +167,32 @@ def to_title_doc(media, synced_at):
         "current_popularity": media["popularity"],
         "site_url": media["siteUrl"],
         "cover_url": (media.get("coverImage") or {}).get("large"),
-        "synced_at": synced_at,
+        "content_changed_at": changed_at,
     }
 
 
 # --- Working out what to write ---------------------------------------------
 
-def without_sync_time(doc):
-    return {key: value for key, value in doc.items() if key != "synced_at"}
+def without_change_time(doc):
+    return {key: value for key, value in doc.items() if key != "content_changed_at"}
+
+
+def stored_entries_filter(username):
+    """Which my_entries documents belong to this user's AniList sync.
+
+    my_entries also holds hand-entered TV/movie entries (source "manual"); they must
+    never be compared against AniList, or deleted because AniList doesn't list them.
+    """
+    return {"source": "anilist", "username": username}
+
+
+def entry_deletion_filter(username, removed_ids):
+    """The ONLY filter the sync deletes with: listed _ids, and only AniList entries of this user."""
+    return {"_id": {"$in": list(removed_ids)}, **stored_entries_filter(username)}
 
 
 def plan_changes(stored_docs, fresh_docs):
-    """Compare fresh documents with the stored ones (ignoring synced_at).
+    """Compare fresh documents with the stored ones (ignoring content_changed_at).
 
     Returns which documents are new, which changed, which are unchanged, and which
     stored _ids are no longer in the fresh data.
@@ -184,7 +203,7 @@ def plan_changes(stored_docs, fresh_docs):
         old = stored.get(doc["_id"])
         if old is None:
             plan["new"].append(doc)
-        elif without_sync_time(old) != without_sync_time(doc):
+        elif without_change_time(old) != without_change_time(doc):
             plan["changed"].append(doc)
         else:
             plan["unchanged"].append(doc["_id"])
@@ -193,8 +212,8 @@ def plan_changes(stored_docs, fresh_docs):
     return plan
 
 
-def write_changes(collection, plan, delete_removed):
-    """Write new and changed documents in one batch; optionally delete removed ones."""
+def write_changes(collection, plan, delete_filter=None):
+    """Write new and changed documents in one batch; delete removed ones only with `delete_filter`."""
     to_write = plan["new"] + plan["changed"]
     inserted = modified = deleted = 0
     if to_write:
@@ -204,8 +223,8 @@ def write_changes(collection, plan, delete_removed):
                       for doc in to_write]
         result = collection.bulk_write(operations, ordered=False)
         inserted, modified = result.upserted_count, result.modified_count
-    if delete_removed and plan["removed"]:
-        deleted = collection.delete_many({"_id": {"$in": plan["removed"]}}).deleted_count
+    if delete_filter is not None and plan["removed"]:
+        deleted = collection.delete_many(delete_filter).deleted_count
     return {"inserted": inserted, "modified": modified, "unchanged": len(plan["unchanged"]), "deleted": deleted}
 
 
@@ -223,13 +242,14 @@ def sync(db, username, chunks=None):
     title_docs = list({doc["_id"]: doc for doc in
                        (to_title_doc(entry["media"], started_at) for entry in entries)}.values())
 
-    entry_plan = plan_changes(db["my_entries"].find({"username": username}), entry_docs)
+    entry_plan = plan_changes(db["my_entries"].find(stored_entries_filter(username)), entry_docs)
     title_plan = plan_changes(db["titles"].find({"_id": {"$in": [doc["_id"] for doc in title_docs]}}), title_docs)
 
-    # AniList is the truth: entries gone from AniList are deleted. Titles are kept
-    # (they hold no personal data and may be needed by other features).
-    entry_counts = write_changes(db["my_entries"], entry_plan, delete_removed=True)
-    title_counts = write_changes(db["titles"], title_plan, delete_removed=False)
+    # AniList is the truth for anime: AniList entries gone from AniList are deleted,
+    # and nothing else can match the deletion filter. Titles are kept (no personal data).
+    entry_counts = write_changes(db["my_entries"], entry_plan,
+                                 delete_filter=entry_deletion_filter(username, entry_plan["removed"]))
+    title_counts = write_changes(db["titles"], title_plan)
 
     counts = {
         "fetched": len(entry_docs),

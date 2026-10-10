@@ -23,7 +23,7 @@ TEST_DB = "episode_three_test"
 
 
 def print_stale(database, username):
-    entries = list(database["my_entries"].find({"username": username}))
+    entries = list(database["my_entries"].find(anilist_sync.stored_entries_filter(username)))
     titles = {t["_id"]: t for t in database["titles"].find({"_id": {"$in": [e["title_id"] for e in entries]}})}
     stale = anilist_sync.stale_entries(entries, titles, datetime.now(timezone.utc))
     print(f"\nWatching/Paused entries to check on AniList ({len(stale)}): imported from MAL and not edited "
