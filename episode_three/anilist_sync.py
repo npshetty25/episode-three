@@ -43,10 +43,11 @@ query ($userName: String, $chunk: Int, $perChunk: Int) {
 # REPEATING (rewatching) counts as Completed, with a separate repeating flag.
 STATUS_TO_MAL_CODE = {"CURRENT": 1, "COMPLETED": 2, "REPEATING": 2, "PAUSED": 3, "DROPPED": 4, "PLANNING": 6}
 
-# Origin rule. Nirav imported his old MyAnimeList list into AniList on 2026-10-08:
-# all 139 imported entries have createdAt 08:57:54 UTC (to the second).
-# Entries created before this cutoff came from that import; later ones were added on AniList.
-MAL_IMPORT_CUTOFF = datetime(2026, 10, 8, 10, 0, tzinfo=timezone.utc)
+# Origin rule: entries created before this cutoff came from a MyAnimeList import;
+# later ones were added on AniList. Move the cutoff if Nirav imports again.
+#   2026-10-08 08:57:54 UTC: first import, 139 entries (later deleted on AniList)
+#   2026-10-10 12:59 UTC:    full MAL history re-imported, 12,735 entries, all in one minute
+MAL_IMPORT_CUTOFF = datetime(2026, 10, 10, 14, 0, tzinfo=timezone.utc)
 
 STALE_AFTER_DAYS = 180
 
