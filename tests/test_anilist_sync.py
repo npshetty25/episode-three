@@ -14,8 +14,8 @@ def sample_chunks():
     return [load_fixture("anilist_list_collection_sample.json")["MediaListCollection"]]
 
 
-def sample_docs(synced_at=SYNCED):
-    return {e["id"]: anilist_sync.to_entry_doc(e, "testuser", synced_at)
+def sample_docs(changed_at=SYNCED):
+    return {e["id"]: anilist_sync.to_entry_doc(e, "testuser", changed_at)
             for e in anilist_sync.unique_entries(sample_chunks())}
 
 
@@ -85,7 +85,7 @@ def test_plan_finds_new_changed_unchanged_and_removed():
 
 def test_second_sync_of_same_data_changes_nothing():
     first = list(sample_docs(SYNCED).values())
-    later = list(sample_docs(SYNCED + timedelta(hours=1)).values())  # only synced_at differs
+    later = list(sample_docs(SYNCED + timedelta(hours=1)).values())  # only content_changed_at differs
     plan = anilist_sync.plan_changes(first, later)
     assert plan["new"] == [] and plan["changed"] == [] and plan["removed"] == []
     assert len(plan["unchanged"]) == 7
@@ -130,6 +130,50 @@ def test_stale_entries_and_missing_dates():
     assert [(row["status"], row["title"]) for row in stale] == [("CURRENT", "Show D EN"), ("PAUSED", "anilist:25")]
     assert stale[1]["reason"] == "not updated in 180 days"
     assert anilist_sync.count_without_dates(docs) == 3
+
+
+def matches(mongo_filter, doc):
+    """Evaluate the simple filters the sync uses (equality and $in) against one document."""
+    for field, condition in mongo_filter.items():
+        value = doc.get(field)
+        if isinstance(condition, dict):
+            assert set(condition) == {"$in"}, f"unexpected operator in {condition}"
+            if value not in condition["$in"]:
+                return False
+        elif value != condition:
+            return False
+    return True
+
+
+MANUAL_ENTRY = {"_id": "manual_entry:tvmaze:169", "source": "manual", "title_id": "tvmaze:169",
+                "media_type": "tv", "status": "watching", "mal_status_code": 1}
+
+
+def test_entry_docs_are_tagged_anilist_with_content_changed_at():
+    doc = sample_docs()[1001]
+    assert doc["source"] == "anilist"
+    assert doc["content_changed_at"] == SYNCED and "synced_at" not in doc
+
+
+def test_deletion_filter_can_never_match_a_manual_entry():
+    # Worst case: the manual entry's _id is on the delete list and it even carries the username.
+    manual = dict(MANUAL_ENTRY, username="testuser")
+    anilist_doc = sample_docs()[1001]
+    other_user = dict(anilist_doc, username="someone_else")
+    deletion = anilist_sync.entry_deletion_filter("testuser", [manual["_id"], anilist_doc["_id"], other_user["_id"]])
+    assert not matches(deletion, manual)
+    assert not matches(deletion, MANUAL_ENTRY)
+    assert not matches(deletion, other_user)
+    assert matches(deletion, anilist_doc)
+
+
+def test_manual_entries_are_never_planned_for_removal():
+    anilist_docs = list(sample_docs().values())
+    everything_in_my_entries = anilist_docs + [MANUAL_ENTRY]
+    stored = [d for d in everything_in_my_entries if matches(anilist_sync.stored_entries_filter("testuser"), d)]
+    fresh = anilist_docs[1:]  # the first AniList entry was deleted on AniList
+    plan = anilist_sync.plan_changes(stored, fresh)
+    assert plan["removed"] == [anilist_docs[0]["_id"]]
 
 
 def test_imported_entry_leaves_the_stale_report_once_edited():
