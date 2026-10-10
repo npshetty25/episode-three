@@ -9,6 +9,7 @@
 2. **Phase 11's TMDB-based TV Model A is dropped** (§2, §11, §16).
 3. **Trakt rejected** for Phase 4: free accounts are limited to 250 watchlist items and (since July 2026) one connected community app, the limits keep changing, and OAuth with refresh tokens adds work (§4.2). The TV/movie approach follows in a revised TASK 006: **TV via TVMaze, movies as minimal manual entries**; our database is their source of truth, so backups are needed from Phase 4.
 4. **`--stale` rule deviation (TASK 005):** an imported entry is listed only while `updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS` (60), i.e. until it is edited on AniList. **The 180-day rule still applies** to every CURRENT/PAUSED entry, imported or not (confirmed in code and by a test) (§5).
+6. **Full MAL history re-imported (2026-10-10):** Nirav replaced his 139-entry list with his full history, **12,735 entries** (COMPLETED 12,017, PLANNING 338, DROPPED 203, PAUSED 103, CURRENT 74), all created at 12:59 UTC. `MAL_IMPORT_CUTOFF` moved to 2026-10-10 14:00 UTC, so all are `origin: "mal_import"`. A sync is now **26 requests** (500 entries per chunk, ~1 min); `episode_three` is 15.2 MB (§5, §6).
 5. **AniList sync safety (TASK 006 Part C):** AniList entry documents carry `source: "anilist"`; the sync reads and deletes **only** documents matching `source = "anilist"` AND `username`, so manual TV/movie entries in `my_entries` can never be deleted by it. `synced_at` is renamed `content_changed_at` (last time the content actually changed) on AniList entries and titles (§5).
 
 **v1.3 (2026-10-08)**, the instructor's rulings after TASK 004, plus the tracker decision:
@@ -248,7 +249,7 @@ TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs
 - **`--stale` report (v1.4):** lists CURRENT/PAUSED entries that are either (a) imported and not edited since (`updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS`, 60 s), or (b) not updated for 180 days. Rule (b) applies to all entries, imported or not.
 - **Status mapping (v1.3)** AniList → MAL training codes: CURRENT → 1, COMPLETED → 2, REPEATING → 2 (`repeating: true`), PAUSED → 3, DROPPED → 4, PLANNING → 6.
 - `score_100` is `null` when unscored (AniList returns 0). `started_at`/`completed_at` keep AniList's FuzzyDate parts (any may be null) or are `null` when entirely unset; that is normal, not an error.
-- **`origin` (v1.3):** "mal_import" if the entry was created before `MAL_IMPORT_CUTOFF` (2026-10-08 10:00 UTC; all 139 imported entries share `createdAt` 2026-10-08 08:57:54 UTC), else "anilist". Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
+- **`origin` (v1.3, cutoff moved in v1.4):** "mal_import" if the entry was created before `MAL_IMPORT_CUTOFF`, else "anilist". The cutoff is now 2026-10-10 14:00 UTC: the full MAL history (12,735 entries) was imported at 12:59 UTC that day. It was 2026-10-08 10:00 UTC for the first, 139-entry import, since deleted on AniList. Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
 - `sync_runs` (one per sync): `_id` "sync:anilist:<UTC ISO time>", job, username, started_at, finished_at, requests_used, counts (fetched, inserted, modified, unchanged, deleted, by_status, titles).
 Status is normalized across sources to: `watching | completed | dropped | planning | paused | repeating`.
 
@@ -333,7 +334,7 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
   - Read `animelist.csv` in pandas chunks (it's too big for memory).
   - Keep TV anime only, drop adult titles, keep only completed (status 2) and dropped (status 4) entries.
   - Sample 5,000 users with at least 20 such entries (random seed 42). No API calls; about 30 minutes of local processing.
-- **Nirav's data:** AniList is 1–3 requests per sync. Trakt is about 4 requests. Run manually; scheduled later with Windows Task Scheduler.
+- **Nirav's data:** AniList is 1–3 requests per sync *(v1.4: now 26 requests, about 1 minute, for 12,735 entries at 500 per chunk)*. Trakt is about 4 requests. Run manually; scheduled later with Windows Task Scheduler.
 - **YouTube Music (later):** poll every 3 hours while the PC is on; insert only items newer than the last seen top item.
 - **Deduplication:** upserts on `_id` everywhere; a unique `dedupe_key` for listening history.
 - **Anonymization:** Kaggle IDs are already numeric. If AniList users are ever collected (OPEN-1c), store `sha256(SALT + user_id)` with the salt in `.env`, never store names, and never publish the raw data.
