@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-10
 - **Task:** TASK 006 (revised) from the instructor. Parts B/D/E of the earlier TASK 006 (TV/movie tracker) are cancelled.
-- **Status:** Built and verified by the developer. Waiting on Nirav's acceptance run (including the one forced sync, 26 AniList requests).
+- **Status:** Done. All 6 acceptance checks passed on Nirav's machine (2026-10-10), after one fix to the profile report (see "Acceptance run").
 - **Earlier devlog kept as is:** `006-tv-movie-tracker.md` (terms check, Part C migration, re-import).
 
 ## Summary
@@ -36,6 +36,31 @@
 | `Select-String "v1.5" docs\SPEC.md` | title, changelog entry and 28 other lines |
 
 **Not run by the developer: the forced sync (26 requests).** The task's budget is 30 and one forced sync costs 26, so I left it for Nirav's acceptance run. The burst-rule check above shows what its origin counts will be.
+
+## Acceptance run by Nirav (PowerShell, 2026-10-10)
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `python -m pytest -q` | `40 passed, 1 deselected in 1.05s` ✅ |
+| 2 | `python scripts\sync_anilist.py` | `synced 0.6 h ago, use --force (syncs under 24 h apart are skipped)`, `AniList requests used: 0` ✅ |
+| 3 | `python scripts\sync_anilist.py --force` | entries fetched 12,735, **inserted 0, modified 0, unchanged 12,735, deleted 0**; titles modified 274 (popularity); by_status COMPLETED 12,017 / CURRENT 74 / DROPPED 203 / PAUSED 103 / PLANNING 338; **by_origin mal_import 12,735**; 26 requests ✅ |
+| 4 | `python scripts\profile_vs_training.py` | same numbers as the developer run; report written ✅ |
+| 5 | `Select-String "v1.5" docs\SPEC.md` | title, changelog and all v1.5 sections found ✅ |
+| 6 | `git status` / `git log -8` | log lists `d4365fe TASK 006: spec v1.5` and all improvement commits. **`git status` was NOT clean**: `reports/profile_vs_training.md` was modified ⚠️ (see below) |
+
+**AniList requests for the task:** developer 0 + Nirav 26 = **26 of 30**.
+
+### Issue found by the acceptance run, and fix
+
+- **Cause:** the report began with a `Generated: <date time> UTC` line, so every run of the script changed the file and dirtied the working tree (the only diff was that timestamp, 13:57 → 14:09).
+- **Fix:** the timestamp is removed. The report's content now depends only on the synced list and the training sample. Two consecutive runs produce a byte-identical file (same SHA-256), so acceptance check 6 holds after the report is committed.
+- **Lesson for later reports:** generated files that are committed must be deterministic, or they should not be committed.
+
+### Atlas dashboard vs the database
+
+Nirav's Atlas screenshot shows "Data size: 604.97 KB / 512 MB (0%)" and 7 connections, a throughput spike and "Backups: OFF".
+- **The database itself (`collStats` / `dbStats`, read live at 14:10 UTC):** `my_entries` 12,735 docs, `titles` 12,735 docs, `sync_runs` 4; **dataSize 13.17 MB + indexSize 2.03 MB = 15.20 MB** (what the free tier counts); 6.79 MB compressed on disk.
+- **So the dashboard figure is stale.** 604.97 KB is about what the database held before the big import (0.19 MB production + 0.31 MB test copy ≈ 0.5 MB). Atlas refreshes that tile on a delay; `check_db` asks the database directly. Nothing was lost.
 
 ## Profile comparison (training users: 5,000; entries min 20, median 118, 99th pct 792, max 4,434)
 
