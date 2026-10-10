@@ -1,5 +1,48 @@
 # 006 — TV & movie tracker with TMDB (Phase 4)
 
+## Update 2026-10-10: Part C done (instructor: "proceed with Part C only")
+
+**Rulings applied:** TMDB rejected (ML/AI clause), Phase 11's TMDB TV Model A dropped, and Parts B/D/E not started. A revised TASK 006 (TV via TVMaze, movies as minimal manual entries) follows.
+
+### Changes (one commit each)
+
+| Commit | Change |
+|---|---|
+| `daa72cc` | `anilist_sync.py`: entry docs get `source: "anilist"`; new `stored_entries_filter(username)` = `{source: "anilist", username}` and `entry_deletion_filter(username, ids)` = `{_id ∈ ids, source: "anilist", username}`. The sync reads and deletes only through these filters. `synced_at` → `content_changed_at` (entries and titles). `sync_anilist.py --stale` reads through the same filter, so manual entries never reach the AniList stale report. |
+| `4203421` | 3 new tests: entry docs carry `source` + `content_changed_at`; **the deletion filter never matches a manual entry**, even with its `_id` on the delete list and the same username; manual entries are never planned for removal. A small pure-Python filter evaluator keeps them offline. |
+| `a4beef2` | `scripts/migrate_anilist_docs.py`: idempotent migration over `episode_three` and `episode_three_test` |
+| *(this update)* | `docs/SPEC.md` → **v1.4**; this devlog |
+
+### Migration counts
+
+| Database | AniList entries | `source` added | Entries renamed | Titles renamed | Left without `source` | Docs still with `synced_at` |
+|---|---|---|---|---|---|---|
+| `episode_three` | 139 | **139** | **139** | **139** | 0 | 0 |
+| `episode_three_test` | 139 | **139** | **139** | **139** | 0 | 0 |
+
+The second run changed **0** in both databases, so the migration is idempotent.
+
+### Verification
+
+- **`python -m pytest -q`:** `29 passed, 1 deselected` (was 26; +3 safety tests).
+- **`sync_anilist.py --test` after the migration** (1 AniList request): entries 0 inserted, **2 modified**, 137 unchanged, 0 deleted; titles 139 modified.
+  - Checked field by field against the not-yet-synced production copy: the 2 entries are Nirav's own AniList edits on 2026-10-09 (two shows CURRENT → COMPLETED, progress 0 → 13 and 0 → 8, `completed_at` 2026-10-09).
+  - The 139 titles differ only in `current_popularity` (all 139), plus 1 score change. That is two days of AniList activity, not a migration artefact.
+- **`--stale` (test DB):** reasons now read "imported, not edited since"; the list shrinks as Nirav edits entries (Uzumaki and Monster still listed; 136 of 139 without dates).
+- **180-day rule confirmed:** `stale_entries` flags `untouched_import(doc) or updated_at < now − 180 days`. Rule (b) applies to every CURRENT/PAUSED entry. `test_stale_entries_and_missing_dates` covers a non-imported PAUSED entry flagged after 180 days.
+
+### What failed
+
+- **First migration attempt:** Atlas refused the TLS handshake (`TLSV1_ALERT_INTERNAL_ERROR`, IP not on the access list; Nirav's IP changes often). Nothing was written. Succeeded on retry.
+
+### Note on order
+
+The new sync code expects `source: "anilist"` on stored entries. The migration ran **before** any sync with the new code, as required (a sync first would have rewritten all 139 entries, though never deleted any).
+
+---
+
+*(Original stop report below.)*
+
 - **Date:** 2026-10-09
 - **Task:** TASK 006 from the instructor
 - **Status:** **STOPPED at Part B (terms check)**, before any code, as the task instructs. Three blockers need decisions; no feature work was done.
