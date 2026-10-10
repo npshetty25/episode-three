@@ -53,6 +53,12 @@ The second run changed **0** in both databases, so the migration is idempotent.
 - **The AniList doc's "11,000 most recently updated entries" cap did not bite:** chunked fetching returned all 12,735.
 - **Atlas refused connections twice today** (IP changed). Nirav chose to keep the allowlist and re-add his IP when needed.
 
+### Old 139-entry list removed (Nirav's request, 2026-10-10)
+
+- **Production was already clean:** 12,735 entries, 12,735 titles, 0 titles unused by any entry. All of the old list's shows are in the full history.
+- **The old list existed only in `episode_three_test`** (139 entries, 139 titles, 8 `sync_runs`). That database held only test copies, so it was **dropped entirely**. The next `--test` sync or live test recreates it (26 requests, about 15 MB, since the test sync now copies the full list).
+- **Storage now:** 15.20 MB total (3.0%).
+
 ### Note on order
 
 The new sync code expects `source: "anilist"` on stored entries. The migration ran **before** any sync with the new code, as required (a sync first would have rewritten all 139 entries, though never deleted any).
