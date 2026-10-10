@@ -43,11 +43,12 @@ query ($userName: String, $chunk: Int, $perChunk: Int) {
 # REPEATING (rewatching) counts as Completed, with a separate repeating flag.
 STATUS_TO_MAL_CODE = {"CURRENT": 1, "COMPLETED": 2, "REPEATING": 2, "PAUSED": 3, "DROPPED": 4, "PLANNING": 6}
 
-# Origin rule: entries created before this cutoff came from a MyAnimeList import;
-# later ones were added on AniList. Move the cutoff if Nirav imports again.
-#   2026-10-08 08:57:54 UTC: first import, 139 entries (later deleted on AniList)
-#   2026-10-10 12:59 UTC:    full MAL history re-imported, 12,735 entries, all in one minute
-MAL_IMPORT_CUTOFF = datetime(2026, 10, 10, 14, 0, tzinfo=timezone.utc)
+# Origin rule (burst detection). A MyAnimeList import creates hundreds of entries within
+# one minute, while hand-added entries trickle in one at a time. So an entry is
+# "mal_import" if at least this many entries share its createdAt minute (UTC).
+# Evidence: the 2026-10-08 import (139 entries) and the 2026-10-10 re-import (12,735
+# entries) were each created within a single minute.
+IMPORT_BURST_MIN_ENTRIES = 50
 
 STALE_AFTER_DAYS = 180
 
@@ -108,18 +109,37 @@ def unix_to_datetime(seconds):
     return datetime.fromtimestamp(seconds, tz=timezone.utc)
 
 
-def entry_origin(created_at_seconds, cutoff=MAL_IMPORT_CUTOFF):
-    """'mal_import' if the entry was created before the import cutoff, else 'anilist'."""
-    if not created_at_seconds or unix_to_datetime(created_at_seconds) < cutoff:
+def created_minute(created_at_seconds):
+    """The UTC minute an entry was created in (whole minutes since 1970)."""
+    return created_at_seconds // 60
+
+
+def import_burst_minutes(entries, min_entries=IMPORT_BURST_MIN_ENTRIES):
+    """The UTC minutes in which at least `min_entries` entries were created (an import)."""
+    per_minute = Counter(created_minute(e["createdAt"]) for e in entries if e["createdAt"])
+    return {minute for minute, count in per_minute.items() if count >= min_entries}
+
+
+def entry_origin(created_at_seconds, burst_minutes):
+    """'mal_import' if the entry was created inside an import burst (or has no createdAt), else 'anilist'."""
+    if not created_at_seconds or created_minute(created_at_seconds) in burst_minutes:
         return "mal_import"
     return "anilist"
 
 
-def to_entry_doc(entry, username, changed_at):
+def build_entry_docs(entries, username, changed_at, min_burst=IMPORT_BURST_MIN_ENTRIES):
+    """All my_entries documents for a list of AniList entries, with burst-detected origins."""
+    bursts = import_burst_minutes(entries, min_burst)
+    return [to_entry_doc(entry, username, changed_at, entry_origin(entry["createdAt"], bursts))
+            for entry in entries]
+
+
+def to_entry_doc(entry, username, changed_at, origin):
     """One AniList list entry -> one my_entries document.
 
     `changed_at` is stored as content_changed_at. It is only written when the
     content really changed (see plan_changes), so it means "last real change".
+    `origin` comes from burst detection over the whole list (see build_entry_docs).
     """
     status = entry["status"]
     if status not in STATUS_TO_MAL_CODE:
@@ -138,7 +158,7 @@ def to_entry_doc(entry, username, changed_at):
         "completed_at": fuzzy_date(entry["completedAt"]),
         "created_at": unix_to_datetime(entry["createdAt"]),
         "updated_at": unix_to_datetime(entry["updatedAt"]),
-        "origin": entry_origin(entry["createdAt"]),
+        "origin": origin,
         "content_changed_at": changed_at,
     }
 
@@ -239,7 +259,7 @@ def sync(db, username, chunks=None):
         chunks = fetch_list(username)
 
     entries = unique_entries(chunks)
-    entry_docs = [to_entry_doc(entry, username, started_at) for entry in entries]
+    entry_docs = build_entry_docs(entries, username, started_at)
     title_docs = list({doc["_id"]: doc for doc in
                        (to_title_doc(entry["media"], started_at) for entry in entries)}.values())
 

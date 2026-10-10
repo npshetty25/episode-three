@@ -15,8 +15,10 @@ def sample_chunks():
 
 
 def sample_docs(changed_at=SYNCED):
-    return {e["id"]: anilist_sync.to_entry_doc(e, "testuser", changed_at)
-            for e in anilist_sync.unique_entries(sample_chunks())}
+    # The 7-entry fixture has a "burst" of 4 entries in one minute, so lower the threshold to 4.
+    entries = anilist_sync.unique_entries(sample_chunks())
+    docs = anilist_sync.build_entry_docs(entries, "testuser", changed_at, min_burst=4)
+    return {entry["id"]: doc for entry, doc in zip(entries, docs)}
 
 
 def test_status_mapping_matches_mal_codes():
@@ -31,7 +33,7 @@ def test_status_mapping_matches_mal_codes():
 def test_unknown_status_is_a_clear_error():
     entry = anilist_sync.unique_entries(sample_chunks())[0] | {"status": "WATCHING_LATER"}
     with pytest.raises(ValueError, match="WATCHING_LATER"):
-        anilist_sync.to_entry_doc(entry, "testuser", SYNCED)
+        anilist_sync.to_entry_doc(entry, "testuser", SYNCED, "anilist")
 
 
 def test_score_zero_means_unscored():
@@ -55,15 +57,48 @@ def test_entry_in_custom_list_is_counted_once():
     assert [e["id"] for e in entries].count(1003) == 1
 
 
-def test_origin_rule():
-    cutoff = anilist_sync.MAL_IMPORT_CUTOFF
-    import_moment = int(datetime(2026, 10, 8, 8, 57, 54, tzinfo=timezone.utc).timestamp())
-    series = [import_moment, import_moment + 171, int(cutoff.timestamp()) - 1,
-              int(cutoff.timestamp()), int((cutoff + timedelta(days=5)).timestamp()), 0]
-    assert [anilist_sync.entry_origin(s) for s in series] == [
-        "mal_import", "mal_import", "mal_import", "anilist", "anilist", "mal_import"]
-    docs = sample_docs()
-    assert docs[1001]["origin"] == "mal_import" and docs[1002]["origin"] == "anilist"
+def fake_entries(created_at_list):
+    """Minimal entries: just an id and a createdAt (unix seconds), enough for the origin rule."""
+    return [{"id": number, "createdAt": created} for number, created in enumerate(created_at_list, 1)]
+
+
+def origins(created_at_list):
+    entries = fake_entries(created_at_list)
+    bursts = anilist_sync.import_burst_minutes(entries)
+    return [anilist_sync.entry_origin(e["createdAt"], bursts) for e in entries]
+
+
+IMPORT_MINUTE = int(datetime(2026, 10, 10, 12, 59, tzinfo=timezone.utc).timestamp())
+OTHER_MINUTE = int(datetime(2026, 10, 8, 8, 57, tzinfo=timezone.utc).timestamp())
+
+
+def test_burst_of_60_is_an_import_and_single_entries_are_not():
+    burst = [IMPORT_MINUTE + (i % 60) for i in range(60)]  # 60 entries within one minute
+    singles = [IMPORT_MINUTE + 86_400 * (day + 1) for day in range(3)]  # one per later day
+    assert origins(burst + singles) == ["mal_import"] * 60 + ["anilist"] * 3
+
+
+def test_burst_just_under_the_threshold_is_not_an_import():
+    assert anilist_sync.IMPORT_BURST_MIN_ENTRIES == 50
+    assert origins([IMPORT_MINUTE + (i % 60) for i in range(49)]) == ["anilist"] * 49
+    assert origins([IMPORT_MINUTE + (i % 60) for i in range(50)]) == ["mal_import"] * 50
+
+
+def test_two_separate_bursts_are_both_imports():
+    first = [OTHER_MINUTE + (i % 60) for i in range(55)]
+    second = [IMPORT_MINUTE + (i % 60) for i in range(70)]
+    manual = [IMPORT_MINUTE + 7200]
+    assert origins(first + second + manual) == ["mal_import"] * 125 + ["anilist"]
+
+
+def test_missing_created_at_counts_as_import():
+    assert origins([None, 0, IMPORT_MINUTE]) == ["mal_import", "mal_import", "anilist"]
+
+
+def test_origin_in_the_fixture():
+    docs = sample_docs()  # threshold lowered to 4: four entries share one minute, three share another
+    assert docs[1001]["origin"] == "mal_import" and docs[1004]["origin"] == "mal_import"
+    assert docs[1002]["origin"] == "anilist" and docs[1007]["origin"] == "anilist"
 
 
 def test_empty_list_gives_no_entries():
