@@ -35,6 +35,24 @@ The second run changed **0** in both databases, so the migration is idempotent.
 
 - **First migration attempt:** Atlas refused the TLS handshake (`TLSV1_ALERT_INTERNAL_ERROR`, IP not on the access list; Nirav's IP changes often). Nothing was written. Succeeded on retry.
 
+### Full MAL history re-imported by Nirav (2026-10-10)
+
+- **First production sync after Nirav updated AniList:** fetched **12,735**, inserted 12,735, **deleted 139**, titles inserted 12,596; **26 requests** (500 entries per chunk).
+  - All 139 old entry IDs were gone on AniList, so the sync deleted them, as designed. The old 139-entry list is still in `episode_three_test`.
+- **Analysis (database only):**
+  - All 12,735 entries were created in the same minute (2026-10-10 12:59 UTC); 11,300 are scored.
+  - Formats: TV 4,500, MOVIE 2,136, OVA 2,037, ONA 1,342, SPECIAL 1,205, MUSIC 828, TV_SHORT 633, unknown 54. 188 adult titles. Years from the 1940s to 2026.
+  - **Nirav confirmed it is his real, full MAL history.**
+- **Bug exposed:** the fixed `MAL_IMPORT_CUTOFF` (2026-10-08) labelled all 12,735 as `origin: "anilist"`, so `--stale` showed 0. *Fix:* the cutoff moved to 2026-10-10 14:00 UTC (commit `3ffa880`; tests still 29 passed).
+- **Re-sync:** entries 0 inserted / **12,735 modified** (`origin` only) / 0 deleted; titles 52 modified (popularity); 26 requests.
+  - `by_status`: COMPLETED 12,017, PLANNING 338, DROPPED 203, PAUSED 103, CURRENT 74.
+  - `--stale`: **177** entries (all imported, not edited since).
+  - 10,041 of 12,735 entries have no start or finish date.
+- **Storage:** `episode_three` 15.20 MB, `episode_three_test` 0.31 MB, total 15.51 MB (3.0%).
+- **AniList requests on 2026-10-10:** 1 (`--test` verification) + 26 (sync attempt that fetched, then failed on the Atlas IP allowlist) + 26 (first sync) + 26 (re-sync) = **79**.
+- **The AniList doc's "11,000 most recently updated entries" cap did not bite:** chunked fetching returned all 12,735.
+- **Atlas refused connections twice today** (IP changed). Nirav chose to keep the allowlist and re-add his IP when needed.
+
 ### Note on order
 
 The new sync code expects `source: "anilist"` on stored entries. The migration ran **before** any sync with the new code, as required (a sync first would have rewritten all 139 entries, though never deleted any).
