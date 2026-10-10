@@ -50,6 +50,9 @@ def main():
         print_stale(database, username)
         return
 
+    # Fail fast: check Atlas before any AniList request (a sync is 26 requests).
+    anilist_sync.ping_database(database)
+
     counts = anilist_sync.sync(database, username)
     # create_index does nothing if the index already exists.
     database["my_entries"].create_index("title_id")
@@ -76,4 +79,5 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as error:
         print("\nSync stopped: " + db.explain_error(error), file=sys.stderr)
+        print(f"AniList requests used: {anilist.stats['requests']}", file=sys.stderr)
         sys.exit(1)

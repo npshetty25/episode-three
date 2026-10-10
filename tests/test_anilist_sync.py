@@ -145,6 +145,40 @@ def test_fetch_list_turns_unknown_user_into_a_clear_error(monkeypatch):
         anilist_sync.fetch_list("ghost")
 
 
+def test_failed_ping_means_anilist_is_never_called():
+    calls = []
+
+    def failing_ping(database):
+        calls.append("ping")
+        raise RuntimeError("Atlas unreachable")
+
+    def fetch(username):
+        calls.append("fetch")
+        return []
+
+    with pytest.raises(RuntimeError, match="Atlas unreachable"):
+        anilist_sync.sync(None, "testuser", ping=failing_ping, fetch=fetch)
+    assert calls == ["ping"]
+
+
+def test_ping_comes_before_the_fetch():
+    calls = []
+
+    class Stop(Exception):
+        pass
+
+    def ping(database):
+        calls.append("ping")
+
+    def fetch(username):
+        calls.append("fetch")
+        raise Stop  # stop here: this test only checks the order
+
+    with pytest.raises(Stop):
+        anilist_sync.sync(None, "testuser", ping=ping, fetch=fetch)
+    assert calls == ["ping", "fetch"]
+
+
 def test_fetch_list_follows_chunks(monkeypatch):
     calls = []
 

@@ -251,12 +251,24 @@ def write_changes(collection, plan, delete_filter=None):
 
 # --- The sync --------------------------------------------------------------
 
-def sync(db, username, chunks=None):
-    """Sync one user's list into db. Pass `chunks` to reuse an earlier fetch (no request)."""
+def ping_database(db):
+    """Ask Atlas to answer a ping. Raises if the database cannot be reached."""
+    db.client.admin.command("ping")
+
+
+def sync(db, username, chunks=None, ping=ping_database, fetch=fetch_list):
+    """Sync one user's list into db. Pass `chunks` to reuse an earlier fetch (no request).
+
+    `ping` and `fetch` can be swapped by tests, so the order of events can be checked
+    without a network.
+    """
+    # Fail fast: a full sync costs 26 AniList requests, so make sure the database
+    # is reachable BEFORE spending any of them.
+    ping(db)
     started_at = datetime.now(timezone.utc)
     requests_before = anilist.stats["requests"]
     if chunks is None:
-        chunks = fetch_list(username)
+        chunks = fetch(username)
 
     entries = unique_entries(chunks)
     entry_docs = build_entry_docs(entries, username, started_at)
