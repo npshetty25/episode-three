@@ -145,6 +145,19 @@ def test_fetch_list_turns_unknown_user_into_a_clear_error(monkeypatch):
         anilist_sync.fetch_list("ghost")
 
 
+def test_skip_decision_for_recent_sync():
+    now = datetime(2026, 10, 11, 12, 0, tzinfo=timezone.utc)
+    assert anilist_sync.SYNC_MIN_INTERVAL_HOURS == 24
+    skip, hours = anilist_sync.should_skip_sync(now - timedelta(hours=3, minutes=30), now)
+    assert skip is True and hours == pytest.approx(3.5)
+    # exactly 24 h is NOT skipped (the rule is "under 24 h"), and neither is anything older
+    assert anilist_sync.should_skip_sync(now - timedelta(hours=24), now)[0] is False
+    assert anilist_sync.should_skip_sync(now - timedelta(days=3), now) == (False, pytest.approx(72.0))
+    # a custom interval, and a database that has never synced
+    assert anilist_sync.should_skip_sync(now - timedelta(hours=3), now, min_hours=2)[0] is False
+    assert anilist_sync.should_skip_sync(None, now) == (False, None)
+
+
 def test_failed_ping_means_anilist_is_never_called():
     calls = []
 

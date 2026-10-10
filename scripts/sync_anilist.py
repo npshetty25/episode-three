@@ -1,7 +1,8 @@
 """Sync Nirav's public AniList anime list into MongoDB (read-only; never writes to AniList).
 
 Run from the episode-three folder:
-    python scripts\\sync_anilist.py              # into the episode_three database
+    python scripts\\sync_anilist.py              # into the episode_three database (skipped if synced < 24 h ago)
+    python scripts\\sync_anilist.py --force      # sync even if the last sync was recent
     python scripts\\sync_anilist.py --test       # into episode_three_test instead
     python scripts\\sync_anilist.py --stale      # list entries to fix on AniList (no AniList request)
     python scripts\\sync_anilist.py --username someone
@@ -39,6 +40,8 @@ def main():
     parser.add_argument("--username", help="AniList username (default: ANILIST_USERNAME from .env)")
     parser.add_argument("--test", action="store_true", help=f"write to the {TEST_DB} database")
     parser.add_argument("--stale", action="store_true", help="only print the stale-entry report from the database")
+    parser.add_argument("--force", action="store_true",
+                        help=f"sync even if the last sync was under {anilist_sync.SYNC_MIN_INTERVAL_HOURS} hours ago")
     args = parser.parse_args()
     sys.stdout.reconfigure(errors="backslashreplace")
 
@@ -52,6 +55,15 @@ def main():
 
     # Fail fast: check Atlas before any AniList request (a sync is 26 requests).
     anilist_sync.ping_database(database)
+
+    if not args.force:
+        last = anilist_sync.last_sync_finished_at(database, username)
+        skip, hours = anilist_sync.should_skip_sync(last, datetime.now(timezone.utc))
+        if skip:
+            print(f"synced {hours:.1f} h ago, use --force "
+                  f"(syncs under {anilist_sync.SYNC_MIN_INTERVAL_HOURS} h apart are skipped)")
+            print("AniList requests used: 0")
+            return
 
     counts = anilist_sync.sync(database, username)
     # create_index does nothing if the index already exists.

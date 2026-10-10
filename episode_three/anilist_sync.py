@@ -52,6 +52,10 @@ IMPORT_BURST_MIN_ENTRIES = 50
 
 STALE_AFTER_DAYS = 180
 
+# A sync is 26 AniList requests. Skip it if the last one finished less than this long ago
+# (unless --force).
+SYNC_MIN_INTERVAL_HOURS = 24
+
 # An imported entry still counts as untouched if it was updated within this many seconds of
 # its creation. After Nirav edits it on AniList, updated_at moves later and it leaves the report.
 IMPORT_EDIT_GRACE_SECONDS = 60
@@ -254,6 +258,25 @@ def write_changes(collection, plan, delete_filter=None):
 def ping_database(db):
     """Ask Atlas to answer a ping. Raises if the database cannot be reached."""
     db.client.admin.command("ping")
+
+
+def last_sync_finished_at(db, username):
+    """When the newest sync for this username finished in this database (None if never)."""
+    run = db["sync_runs"].find_one({"job": "anilist_list", "username": username},
+                                   sort=[("finished_at", -1)], projection={"finished_at": 1})
+    return run["finished_at"] if run else None
+
+
+def should_skip_sync(last_finished_at, now, min_hours=SYNC_MIN_INTERVAL_HOURS):
+    """Decide whether to skip a sync. Returns (skip, hours_since_last_sync).
+
+    Skips when the last sync finished less than `min_hours` ago. A first-ever sync
+    (last_finished_at is None) is never skipped.
+    """
+    if last_finished_at is None:
+        return False, None
+    hours = (now - last_finished_at).total_seconds() / 3600
+    return hours < min_hours, hours
 
 
 def sync(db, username, chunks=None, ping=ping_database, fetch=fetch_list):
