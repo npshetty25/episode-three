@@ -311,6 +311,7 @@ def sync(db, username, chunks=None, ping=ping_database, fetch=fetch_list):
         "fetched": len(entry_docs),
         **entry_counts,
         "by_status": dict(sorted(Counter(doc["anilist_status"] for doc in entry_docs).items())),
+        "by_origin": dict(sorted(Counter(doc["origin"] for doc in entry_docs).items())),
         "titles": {"fetched": len(title_docs), **{k: v for k, v in title_counts.items() if k != "deleted"}},
     }
     finished_at = datetime.now(timezone.utc)

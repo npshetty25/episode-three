@@ -79,6 +79,9 @@ def main():
     for status, count in counts["by_status"].items():
         print(f"  {status:<10} {count:>4}")
     print(f"  {'TOTAL':<10} {counts['fetched']:>4}")
+    print("\nBy origin (burst detection):")
+    for origin, count in counts["by_origin"].items():
+        print(f"  {origin:<10} {count:>4}")
     print(f"\nAniList requests used: {counts['requests_used']} (HTTP attempts incl. retries)")
     print("Run with --stale to list Watching/Paused entries worth updating on AniList.")
 

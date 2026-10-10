@@ -99,6 +99,8 @@ def test_origin_in_the_fixture():
     docs = sample_docs()  # threshold lowered to 4: four entries share one minute, three share another
     assert docs[1001]["origin"] == "mal_import" and docs[1004]["origin"] == "mal_import"
     assert docs[1002]["origin"] == "anilist" and docs[1007]["origin"] == "anilist"
+    from collections import Counter
+    assert Counter(d["origin"] for d in docs.values()) == {"mal_import": 4, "anilist": 3}
 
 
 def test_empty_list_gives_no_entries():
