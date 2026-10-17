@@ -1,8 +1,17 @@
-# Episode Three: Project Spec v1.7 (2026-10-17)
+# Episode Three: Project Spec v1.8 (2026-10-18)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.8 (2026-10-18)**, TASK 009 (trend collection, window 1):
+1. **Per-window statuses and "trainable".** Each window has its own status on `model_a_candidates`: `w1_status` and `w2_status`, each `collected` or `no_records`. The two windows live in separate arrays in `score_trends` (`snapshots_w1`, `snapshots_w2`), so each can be re-collected on its own. A show is **trainable** when both windows are collected and it has an episode-3 snapshot and a label; that field is computed in TASK 010, not here (§5, §7).
+2. **`is_complete` = pair coverage.** The optional early stop in `anilist.collect_pages` is true when the rows already contain every (show, episode) pair the query asked for (`covers_every_pair`); each show has at most one schedule row per episode, so a page of exactly shows × episodes rows needs no second request. It is tested; if a pair is missing or rows repeat, it keeps paging (§4.1).
+3. **w2 is batched by finale date WITHOUT the releasing filter.** After the finale the records are `releasing: false`, and the secondary label (finale + 5…9 days) needs them, so w2 returns a record for every show-day of the union window. The projected w2 cost is about 923 requests on union windows (floor 430) (§6).
+4. **The finale is validated from the trend transition.** M(final) comes from the airing schedule; the last `releasing: true` record (the releasing → not-releasing transition) is used to check it, and the primary label is that last releasing record (§7).
+5. **Trend sort rule.** Trend queries sort `[MEDIA_ID, DATE]` (both are in AniList's `MediaTrendSort`; `date_greater`/`date_lesser` are plain `Int` Unix seconds). Sorting by DATE alone leaves ties between the shows of a batch on the same day, and an unstable tie order can skip or repeat rows across pages. We also dedupe on `(mediaId, date)`, count the duplicates, and trim to each show's own window in Python (§4.1, §6).
+
+Also recorded: a pilot of 5 batches stops the run if the records per batch exceed 1.3× the estimate; the request cap (1,100 for the task) counts every earlier run of the script, read from `sync_runs` (job `score_trends_w1`); batches of w1 are sorted by window start, 10 per batch, with windows longer than 40 days in batches of their own.
 
 **v1.7 (2026-10-17)**, TASK 008 (airing markers and trend windows):
 1. **Pagination stop rule:** a paged AniList query stops when `hasNextPage` is false OR a page has fewer rows than `perPage`. It is one shared helper, `anilist.collect_pages`, with a request-budget hook and a page limit. It also accepts an optional `is_complete(rows)` early stop: when the rows already cover everything the query could return (for the marker batches, every requested show/episode pair), no further page can exist, so the extra request AniList's `hasNextPage` would trigger on an exactly-full 50-row page is skipped (§4.1, §6).
@@ -289,18 +298,20 @@ Status is normalized across sources to: `watching | completed | dropped | planni
 
 **`model_a_candidates`** (v1.6): every show AniList lists for Fall 2018 → Summer 2026 (TV/ONA, Japan, non-adult, current popularity ≥ 2,000 as a pre-filter), one document per show, with `eligible` and `exclusion_reasons` (format, country, adult, episodes_unknown, episodes_out_of_range, duration_unknown, duration_short, not_finished). It is separate from `titles`, so the list sync never touches it and it can be rebuilt freely. Fields: static show data (title, format, status, episodes, duration_min, season, season_year, dates, source_material, genres, main_studios, relations with prefixed ids) plus `current_average_score` and `current_popularity` (ANALYSIS ONLY, never features) and `listed_at`. Indexes: `(season_year, season)`, `eligible`. Per-season completion is recorded in `sync_runs` (job `model_a_candidates`). **From TASK 008 (v1.7)** each eligible show also gets: `markers.schedule` {ep1, ep2, ep3, ep4, final} (UTC datetimes at 00:00 JST, or null) and `markers.flags`; `marker_source` {w1, w2} (`schedule`, `fallback_start_date`, `fallback_end_date`, or null); `trend_windows` {w1, w2} each {from, to} or null; `collection_status` (`ready`, `pending`, `excluded`) with `collection_reasons`; and `markers_fetched_at`. A re-run skips shows that already have `markers_fetched_at`; progress is logged in `sync_runs` (job `airing_markers`).
 
-**`score_trends`**: time-series snapshots for Model A, stored as **one document per anime with an embedded array**. The array is naturally bounded (about 90–200 daily records while airing), so embedding is safe and lets one read return a show's whole history. Index: `(season_year, season)`.
+**`score_trends`** (v1.8): time-series snapshots for Model A, stored as **one document per anime with embedded arrays, one per window**. The arrays are small (about 20–40 daily records for w1), so embedding is safe and one read returns a show's history. Index: `(season_year, season)`. A window's array is written only after ALL its pages arrived (one `bulk_write` per batch), so a crash never leaves half a show's history.
 ```json
 {
   "_id": "anilist:154587",
   "season": "FALL", "season_year": 2023,
-  "snapshots": [
-    {"date": {"$date": "2023-10-06T00:00:00Z"}, "episode": 4, "average_score": 89, "popularity": 152000, "in_progress": 98000, "trending": 1200}
+  "snapshots_w1": [
+    {"date": {"$date": "2023-10-05T15:00:00Z"}, "episode": null, "average_score": 87, "popularity": 152000,
+     "in_progress": 98000, "trending": 1200, "releasing": true}
   ],
-  "n_snapshots": 112,
-  "collected_at": {"$date": "2026-10-06T09:00:00Z"}
+  "n_snapshots_w1": 24,
+  "w1_collected_at": {"$date": "2026-10-18T09:00:00Z"}
 }
 ```
+`date` is the BSON UTC datetime that equals 00:00 JST of that day (the same convention as the marker days). `snapshots_w2` / `n_snapshots_w2` / `w2_collected_at` are added the same way by the finale collection. `model_a_candidates` carries `w1_status` / `w1_collected_at` (and later `w2_*`): `collected`, or `no_records` when a show has no record inside its window. Snapshots are trimmed to the show's own window.
 
 **`model_a_features`**: one row per eligible anime, built by an aggregation pipeline. Index: `split`.
 ```json
@@ -364,6 +375,7 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
   - Seasons **Fall 2018 to Summer 2026 (32 seasons)** (v1.2). Earlier seasons are excluded: releasing trend records are daily only from 2018-03-20, 2017 records are weekly with no popularity, and 2016 has none (TASK 003).
   - **Eligible shows (v1.6):** format TV or ONA, Japan, not adult, **status FINISHED**, 8–30 planned episodes, **episode duration ≥ 10 min** (v1.2; drops shorts and mini-dramas), and popularity of at least 2,000 at the episode-3 snapshot. The listing query pre-filters on **current** popularity ≥ 2,000, which only widens the net (popularity at episode 3 is almost always below today's) and is never a feature; the real "≥ 2,000 at the ep3 snapshot" filter is applied later from trend data. Every show's exclusion reasons are stored in `model_a_candidates` (TASK 007), so the dataset is auditable. TASK 003 estimated ~820–1,150 usable shows.
   - **Phase 5 order (v1.6):** candidates → markers → trend windows → features.
+  - **Trend windows (v1.8, TASK 009):** w1 first (about 146 batches; the pilot measured 1.15× the estimate of records, about 48 records per request, so roughly 850 requests for all w1 records); then w2 per finale date without the releasing filter.
   - **Markers (v1.7, TASK 008):** about 154 batch requests for the 1,431 eligible shows (batches of up to 10 sharing the same N); `scripts/estimate_trend_budget.py` turns the stored windows into TASK 009's request estimate.
   - **Collection method (v1.2) = option C:** `mediaTrends(mediaId_in: [~10 ids])` batches with date windows only: release start → M(4), and finale → finale + 7 days. Estimated ~1,300 requests ≈ 50 min at 27/min (+~10 min of 429 waits). It stores the least data, in the spirit of AniList's no-hoarding rule.
   - Collection is resumable: the candidate listing skips seasons already recorded in `sync_runs` (0 requests unless `--force`); trend collection will skip anime already in `score_trends`.
