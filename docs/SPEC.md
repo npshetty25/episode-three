@@ -1,8 +1,19 @@
-# Episode Three: Project Spec v1.5 (2026-10-10)
+# Episode Three: Project Spec v1.6 (2026-10-17)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.6 (2026-10-17)**, the instructor's rulings (TASK 007):
+1. **Phase 5 order:** candidates → markers → trend windows → features (§6, §11).
+2. **Eligibility adds `status = FINISHED`.** Current popularity ≥ 2,000 is a pre-filter only (§6).
+3. **Candidates live in `model_a_candidates`.** Snapshot rules are Python pure functions; aggregation does the reshape + `$merge` (§5, §6).
+4. **Model B "TV" = AniList format TV on both sides** (re-applied to the Kaggle sample in Phase 7). Nirav's count = 4,181; the MAL-typed count is still disclosed (§7).
+5. **No 0–100 → 1–10 conversion** (removed from §7 and risk 11).
+6. **Dashboard:** Kaggle test users by default, plus a Nirav tab with a banner. Nirav's drop rate is kept with its counts. Phase 8 adds a user-feature ablation (§7, §8).
+7. **Burst rule → ±60 s sliding window,** in a later cleanup task (§5).
+8. **OPEN-3:** the schema accepts `mediaId_in`; historical coverage per the TASK 007 probe. **OPEN-4:** FINISHED + finale + 9 days ≤ today (JST), else "pending" (§16).
+9. **Merge risks 12/15; fix the v1.4 item order; fix §4.1's cap line** per the TASK 007 check (§4.1, §16).
 
 **v1.5 (2026-10-10)**, project refocus (revised TASK 006):
 1. **Purpose: a portfolio/showcase project.** Nirav is not a daily user, so scope favours ML and data-engineering depth over tracker features (§1).
@@ -22,8 +33,8 @@
 2. **Phase 11's TMDB-based TV Model A is dropped** (§2, §11, §16).
 3. **Trakt rejected** for Phase 4: free accounts are limited to 250 watchlist items and (since July 2026) one connected community app, the limits keep changing, and OAuth with refresh tokens adds work (§4.2). The TV/movie approach follows in a revised TASK 006: **TV via TVMaze, movies as minimal manual entries**; our database is their source of truth, so backups are needed from Phase 4.
 4. **`--stale` rule deviation (TASK 005):** an imported entry is listed only while `updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS` (60), i.e. until it is edited on AniList. **The 180-day rule still applies** to every CURRENT/PAUSED entry, imported or not (confirmed in code and by a test) (§5).
-6. **Full MAL history re-imported (2026-10-10):** Nirav replaced his 139-entry list with his full history, **12,735 entries** (COMPLETED 12,017, PLANNING 338, DROPPED 203, PAUSED 103, CURRENT 74), all created at 12:59 UTC. `MAL_IMPORT_CUTOFF` moved to 2026-10-10 14:00 UTC, so all are `origin: "mal_import"`. A sync is now **26 requests** (500 entries per chunk, ~1 min); `episode_three` is 15.2 MB (§5, §6).
 5. **AniList sync safety (TASK 006 Part C):** AniList entry documents carry `source: "anilist"`; the sync reads and deletes **only** documents matching `source = "anilist"` AND `username`, so manual TV/movie entries in `my_entries` can never be deleted by it. `synced_at` is renamed `content_changed_at` (last time the content actually changed) on AniList entries and titles (§5).
+6. **Full MAL history re-imported (2026-10-10):** Nirav replaced his 139-entry list with his full history, **12,735 entries** (COMPLETED 12,017, PLANNING 338, DROPPED 203, PAUSED 103, CURRENT 74), all created at 12:59 UTC. `MAL_IMPORT_CUTOFF` moved to 2026-10-10 14:00 UTC, so all are `origin: "mal_import"`. A sync is now **26 requests** (500 entries per chunk, ~1 min); `episode_three` is 15.2 MB (§5, §6).
 
 **v1.3 (2026-10-08)**, the instructor's rulings after TASK 004, plus the tracker decision:
 1. Model B data **CLEARED**. TASK 004's PARTIAL is accepted: the Phase 7 importer drops and logs undocumented status codes (0/5/33/55) and duplicate pairs (§4.6).
@@ -140,7 +151,7 @@ Also updated: §9 `requests` installed in TASK 003 (needed for the probe); §5 s
   - **Design consequences:**
     - AniList stays the source of truth for Nirav's anime. We only *read* and sync it; we never maintain a separate anime list.
     - **Tracker decision (v1.3).** AniList is Nirav's tracker. Clause 5 of https://docs.anilist.co/guide/terms-of-use prohibits using the API within competing, non-complementary services of the same nature (including anime list/tracker services), for user data and media data. So this app is a **dashboard on top of AniList**: it reads only Nirav's own public list (`MediaListCollection`, no OAuth), never writes to it, never offers tracking to others, stores only fields the app uses, and does not fetch `notes`. Building our own anime tracker in MongoDB is **not allowed**. MAL was considered as the tracker and rejected (its API terms are unverified, and it carries the same "competing service" risk). TV/movies are decided in Phase 4 (AniList's rule does not apply there).
-    - `MediaListCollection` returns the whole list at once, capped at the 11,000 most recently updated entries. Chunked with `chunk`/`perChunk` (max 500) + `hasNextChunk`. Scores are fetched as `score(format: POINT_100)`.
+    - AniList's docs say `MediaListCollection` is capped at the 11,000 most recently updated entries, but a chunked fetch returned **all 12,735** of Nirav's entries (v1.6: that cap line was wrong for chunked requests, at least here). Chunked with `chunk`/`perChunk` (max 500) + `hasNextChunk`. Scores are fetched as `score(format: POINT_100)`.
     - **Unknown username:** HTTP 404, `errors: [{"message": "User not found"}]`, `data.MediaListCollection: null` (TASK 005); the sync turns it into a clear error.
     - Model A collection stays modest (about 1,000 shows).
     - We do not mass-collect other users' lists (see OPEN-1).
@@ -262,10 +273,12 @@ TV and movies use IDs like `"tmdb_tv:1396"` / `"tmdb_movie:603"`, with Trakt IDs
 - **`--stale` report (v1.4):** lists CURRENT/PAUSED entries that are either (a) imported and not edited since (`updated_at ≤ created_at + IMPORT_EDIT_GRACE_SECONDS`, 60 s), or (b) not updated for 180 days. Rule (b) applies to all entries, imported or not.
 - **Status mapping (v1.3)** AniList → MAL training codes: CURRENT → 1, COMPLETED → 2, REPEATING → 2 (`repeating: true`), PAUSED → 3, DROPPED → 4, PLANNING → 6.
 - `score_100` is `null` when unscored (AniList returns 0). `started_at`/`completed_at` keep AniList's FuzzyDate parts (any may be null) or are `null` when entirely unset; that is normal, not an error.
-- **`origin` (v1.3; burst detection since v1.5):** an entry is "mal_import" if at least `IMPORT_BURST_MIN_ENTRIES` (50, a named constant) entries share its `createdAt` UTC minute; otherwise "anilist". A missing `createdAt` counts as "mal_import". This replaces the fixed `MAL_IMPORT_CUTOFF` date, which broke when Nirav re-imported. Evidence: the full MAL history (12,735 entries) was created in one minute (2026-10-10 12:59 UTC); the first 139-entry import (2026-10-08) was also one burst. Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
+- **`origin` (v1.3; burst detection since v1.5):** an entry is "mal_import" if at least `IMPORT_BURST_MIN_ENTRIES` (50, a named constant) entries share its `createdAt` UTC minute; otherwise "anilist". A missing `createdAt` counts as "mal_import". This replaces the fixed `MAL_IMPORT_CUTOFF` date, which broke when Nirav re-imported. Evidence: the full MAL history (12,735 entries) was created in one minute (2026-10-10 12:59 UTC); the first 139-entry import (2026-10-08) was also one burst. *(v1.6: this rule will become a ±60-second sliding window in a later cleanup task, because a burst straddling a minute boundary can be split and missed.)* Imported entries have stale progress and mostly unset dates; statuses are roughly correct. Model B never uses progress or dates as features, so imported COMPLETED/DROPPED entries are usable as personal history.
 - `sync_runs` (one per sync): `_id` "sync:anilist:<UTC ISO time>", job, username, started_at, finished_at, requests_used, counts (fetched, inserted, modified, unchanged, deleted, by_status, titles).
 - **Sync behaviour (v1.5):** (1) Atlas is pinged **before** any AniList request, so a refused database connection costs 0 requests (a full sync is 26 requests); (2) if the newest finished `sync_runs` document for this username and database is under `SYNC_MIN_INTERVAL_HOURS` (24) old, the sync prints "synced X h ago, use --force" and makes 0 requests; `--force` overrides it.
 Status is normalized across sources to: `watching | completed | dropped | planning | paused | repeating`.
+
+**`model_a_candidates`** (v1.6): every show AniList lists for Fall 2018 → Summer 2026 (TV/ONA, Japan, non-adult, current popularity ≥ 2,000 as a pre-filter), one document per show, with `eligible` and `exclusion_reasons` (format, country, adult, episodes_unknown, episodes_out_of_range, duration_unknown, duration_short, not_finished). It is separate from `titles`, so the list sync never touches it and it can be rebuilt freely. Fields: static show data (title, format, status, episodes, duration_min, season, season_year, dates, source_material, genres, main_studios, relations with prefixed ids) plus `current_average_score` and `current_popularity` (ANALYSIS ONLY, never features) and `listed_at`. Indexes: `(season_year, season)`, `eligible`. Per-season completion is recorded in `sync_runs` (job `model_a_candidates`).
 
 **`score_trends`**: time-series snapshots for Model A, stored as **one document per anime with an embedded array**. The array is naturally bounded (about 90–200 daily records while airing), so embedding is safe and lets one read return a show's whole history. Index: `(season_year, season)`.
 ```json
@@ -312,7 +325,7 @@ User IDs are Kaggle's numeric IDs, stored as `"mal_user:<id>"` (v1.1); no userna
 ~~**Later:** `listening_history`, `playlists`, `song_links`~~ **Removed in v1.5** with Phase 10.
 
 ### Aggregation pipelines we need
-1. **Model A features** (snapshot selection PENDING TASK 003): `$unwind` snapshots → `$match` episode ∈ {1, 3} → `$sort` by date → `$group` by (anime, episode) taking `$last` → reshape into one row per anime → `$merge` into `model_a_features`.
+1. **Model A features (v1.6):** the marker-day, ep1/ep3 snapshot and label rules are **Python pure functions** (tested offline). MongoDB aggregation does the reshape (one row per anime from `score_trends` windows, joined with `model_a_candidates` for static features) and the `$merge` into `model_a_features`.
 2. **Model B user history stats:** `$unwind` entries → `$match` role = history → `$group` by user → count, drops, drop rate. Per-genre drop rates join `mal_anime` genres in pandas, to avoid large `$lookup`s and sorts on the free tier.
 3. **Anime global drop rate (training users only):** `$unwind` → `$match` split = train → `$group` by anime_id.
 4. **Dashboard:** status counts (`$group`); the planning list joined to latest predictions (`$lookup` with a small pipeline).
@@ -340,10 +353,10 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 
 - **Model A:**
   - Seasons **Fall 2018 to Summer 2026 (32 seasons)** (v1.2). Earlier seasons are excluded: releasing trend records are daily only from 2018-03-20, 2017 records are weekly with no popularity, and 2016 has none (TASK 003).
-  - Eligible shows: format TV or ONA, 8–30 planned episodes, **episode duration ≥ 10 min** (v1.2; drops shorts and mini-dramas), Japan, not adult, popularity of at least 2,000 at the episode-3 snapshot. Roughly 30–40 per season; TASK 003 estimates ~820–1,150 usable, about 1,000.
+  - **Eligible shows (v1.6):** format TV or ONA, Japan, not adult, **status FINISHED**, 8–30 planned episodes, **episode duration ≥ 10 min** (v1.2; drops shorts and mini-dramas), and popularity of at least 2,000 at the episode-3 snapshot. The listing query pre-filters on **current** popularity ≥ 2,000, which only widens the net (popularity at episode 3 is almost always below today's) and is never a feature; the real "≥ 2,000 at the ep3 snapshot" filter is applied later from trend data. Every show's exclusion reasons are stored in `model_a_candidates` (TASK 007), so the dataset is auditable. TASK 003 estimated ~820–1,150 usable shows.
+  - **Phase 5 order (v1.6):** candidates → markers → trend windows → features.
   - **Collection method (v1.2) = option C:** `mediaTrends(mediaId_in: [~10 ids])` batches with date windows only: release start → M(4), and finale → finale + 7 days. Estimated ~1,300 requests ≈ 50 min at 27/min (+~10 min of 429 waits). It stores the least data, in the spirit of AniList's no-hoarding rule.
-  - Collection is resumable: it skips anime already in `score_trends` and logs to `sync_runs`.
-  - All of this depends on TASK 003 confirming the trend data exists.
+  - Collection is resumable: the candidate listing skips seasons already recorded in `sync_runs` (0 requests unless `--force`); trend collection will skip anime already in `score_trends`.
 - **Model B:**
   - Read `animelist.csv` in pandas chunks (it's too big for memory).
   - Keep TV anime only, drop adult titles, keep only completed (status 2) and dropped (status 4) entries.
@@ -365,7 +378,7 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
   - **Primary:** `average_score` of the **last releasing record** (the finale-day record). Stored with `label_source`.
   - **Secondary (sensitivity, reported in Phase 6):** the score at **finale + 7 days**: the nearest scored record within M(final) + 5…+9 (from `releasing: false` records).
   - Store `current_average_score` for analysis only, never as a feature.
-- **Exclusions:** no ep3 snapshot; no scored label; episode duration < 10 min.
+- **Exclusions:** no ep3 snapshot; no scored label; episode duration < 10 min; status not FINISHED. **Pending rule (OPEN-4, v1.6):** a show counts only if it is FINISHED and finale + 9 days ≤ today (JST); otherwise it is marked "pending", not excluded.
 - **Features (v1):**
   - `ep3_score`, `ep1_score`, `score_delta_1_3`
   - `ep3_popularity`, `popularity_growth_1_3` (ep3 ÷ ep1), `ep3_in_progress`
@@ -399,10 +412,10 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 - **Good enough:** ROC-AUC at least 0.03 above the best baseline on test.
 - **Inference for Nirav:**
   - Map his AniList entries to MAL IDs via `titles.mal_id`.
-  - **Compute his user features with the same filter as training (v1.5): TV format, non-adult, completed vs dropped** (REPEATING counts as completed), not from all 12,220 labelled entries across formats.
+  - **Compute his user features with the same filter as training (v1.5): TV format, non-adult, completed vs dropped** (REPEATING counts as completed), not from all 12,220 labelled entries across formats. **v1.6: "TV" means AniList format TV on both sides:** in Phase 7 the Kaggle sample is re-filtered by mapping its anime to AniList (`idMal`) and keeping AniList format TV. His count is 4,181; the MAL-typed count (4,674–4,791) is still disclosed.
   - Predict for his planning list.
-  - For currently airing shows, Model A's predicted finale score (converted from 0–100 to the 1–10 scale) replaces the community score. That's how the two models connect.
-- **Known limits:** 2020 MAL users may behave differently from AniList users in 2026; the 0–100 vs 1–10 score scales differ; the history/target split is random rather than by time, because Kaggle has no per-entry timestamps.
+  - For currently airing shows, Model A's predicted finale score replaces the community score (both are AniList 0–100 scores, so **no scale conversion**, v1.6). That's how the two models connect.
+- **Known limits:** 2020 MAL users may behave differently from AniList users in 2026; the history/target split is random rather than by time, because Kaggle has no per-entry timestamps.
 - **Disclosure of Nirav's profile (v1.5).** The Model Report must state where his profile sits relative to the training users (`reports/profile_vs_training.md`, measured with 0 network requests): 4,181 labelled TV entries (percentile 99.98; the training range is 20–4,434 with a median of 118, so he is inside the range but at the extreme top, and only 1 of 5,000 training users has more), 3.0% dropped (percentile 43; training median 4.1%). Caveats: (a) his history is a bulk import of a MAL list, so statuses are "roughly correct" and not a record of choices made on AniList; (b) **MAL types 493 of his 617 `TV_SHORT` entries as `TV`** (7 as ONA/Special; 117 were added to MAL after the 2020 snapshot), so counted as MAL counts them his labelled count is 4,674 to 4,791, **above the training maximum of 4,434**. The Model Report states both numbers.
 - **Demo profiles (v1.5):** (a) anonymous held-out Kaggle TEST users (numeric IDs), showing predicted drop probability vs what actually happened; (b) Nirav's own synced list (his consent). Never other AniList users' lists (AniList terms).
 
@@ -424,6 +437,8 @@ The sample dataset was measured (143 MB) and dropped in TASK 002.
 | My List *(optional)* | Read-only view of the synced AniList list | `my_entries` + `titles` |
 
 **Demo profiles (v1.5):** (a) anonymous held-out Kaggle test users; (b) Nirav's own list. Never other AniList users' lists.
+
+**Dashboard behaviour (v1.6):** "Will It Be Dropped?" shows the Kaggle test users by default, plus a separate Nirav tab with a visible banner about his profile (volume at or beyond the training edge, bulk import). His drop rate is kept, shown with its counts (drops and total). Phase 8 adds a user-feature ablation: Model B with and without user-level features.
 
 ## 9. Tech stack
 
@@ -489,7 +504,7 @@ episode-three/
 | 2 | Risk probes (TASKs 003–004) | Confirm AniList trend coverage; check Kaggle license and size | Why de-risk before building |
 | 3 | Anime tracker | AniList client with rate limiter; idempotent sync of Nirav's list into `titles` + `my_entries`; first tests | GraphQL, rate limiting, upserts and idempotency |
 | ~~4~~ | ~~TV/movie tracker~~ | **REMOVED (v1.5):** Nirav is not a daily user, and the project is a portfolio piece, so scope favours ML and data-engineering depth over tracker features. TMDB and Trakt were rejected earlier (§17). | Why cutting features made the project stronger |
-| 5 | Model A data | Resumable trend collection; feature pipeline into `model_a_features` | Embedded arrays, aggregation pipelines |
+| 5 | Model A data | **v1.6 order:** candidate list (TASK 007) → marker days → resumable trend windows → feature pipeline into `model_a_features` | Pre-filter vs real filter, embedded arrays, aggregation pipelines |
 | 6 | Model A training | Baselines + 3 models; report committed | Regression, MAE, time-based splits, leakage |
 | 7 | Model B data | Kaggle sample into `mal_*`; history/target roles | Chunked processing, anonymization, data terms |
 | 8 | Model B training | Baselines + 3 models; report committed | Classification, ROC-AUC vs PR-AUC, group splits |
@@ -541,8 +556,8 @@ From the original project brief:
 |---|---|---|
 | OPEN-1 | Model B data source | **Decided (v1.2):** hernan4444 Kaggle dataset for v1 (§4.6) |
 | OPEN-2 | Do AniList trends go back to 2019 with per-episode scores, and what defines the finale label? | **Resolved (v1.2):** GO from Fall 2018 (90% of sampled shows usable); definitions in §7 |
-| OPEN-3 | Does `airingSchedules` accept `mediaId_in` like `mediaTrends`? | Test with 1 request in Phase 5. If not, rely on trend markers (99% within ±1 day of the schedule) |
-| OPEN-4 | Summer 2026 shows may not have reached finale + 7 days | Before counting a Summer 2026 show as usable, confirm finale + 7 days has passed |
+| OPEN-3 | Does `airingSchedules` accept `mediaId_in` like `mediaTrends`? | **Resolved (v1.6):** yes, the schema accepts `mediaId_in`. Historical coverage is measured by the TASK 007 probe (`scripts/probe_airing_schedules.py`); if schedules have gaps, fall back to trend episode markers (99% within ±1 day of the schedule) |
+| OPEN-4 | Summer 2026 shows may not have reached finale + 7 days | **Rule (v1.6):** a show counts only if FINISHED and finale + 9 days ≤ today (JST); otherwise it is "pending" |
 | 3 | Kaggle license unclear | TASK 004 checks it. If restrictive, use option (c) with permission from AniList |
 | 4 | AniList limit may change from 30/min | **Rewritten (v1.2):** `X-RateLimit-Remaining` does NOT predict 429s (a hidden limiter fires while it shows 20+). Keep the 2.2 s spacing and honour `Retry-After`; that is the real protection |
 | 5 | Atlas 512 MB | Drop sample data now; check `dbStats` after each import |
@@ -552,10 +567,9 @@ From the original project brief:
 | 9 | Trakt API and limit changes in 2026 | **Closed (v1.4):** Trakt rejected |
 | 10 | TMDB episode ratings are current, not as-of-episode-3 | **Closed (v1.4):** TMDB rejected, TV Model A dropped |
 | 14 | Nirav's ISP (Jio) blocks some sites at DNS level (themoviedb.org); Atlas DNS timeouts seen too | Encrypted DNS (DoH) on Windows; no IP pinning in code |
-| 15 | Nirav's IP changes often (Atlas refuses with `TLSV1_ALERT_INTERNAL_ERROR`) | Add the current IP in Atlas → IP Access List when it happens; `check_db` explains the error. **Deployment (v1.5, decide in Phase 12):** a hosted Streamlit app would have the same problem, since its IP is unknown and changes; evaluate a demo snapshot without live DB access, or other approaches, then |
+| 15 | Atlas IP allowlist: Nirav's IP changes often, so connections time out or are refused with `TLSV1_ALERT_INTERNAL_ERROR` (v1.6: merged with former risk 12) | Add the current IP in Atlas → IP Access List when it happens; `check_db` explains the error. **Deployment (v1.5, decide in Phase 12):** a hosted Streamlit app would have the same problem, since its IP is unknown and changes; evaluate a demo snapshot without live DB access, or other approaches, then |
 | 16 | Nirav's profile vs the training users (v1.5) | Measured in `reports/profile_vs_training.md`: with the TV filter, inside the training range at the extreme top for entry count and typical for drop rate; counted the way MAL types shows (TV_SHORT included) his count is above the training maximum. Disclosed in the Model Report |
-| 11 | MAL 2020 → AniList 2026 shift; score-scale mismatch | State in the limitations section; compare Nirav's predicted vs actual drops over time |
-| 12 | Atlas IP allowlist: home IP changes cause connection timeouts | TASK 002 documents the fix |
+| 11 | MAL 2020 → AniList 2026 shift | State in the limitations section; compare Nirav's predicted vs actual drops over time |
 | 13 | Python 3.13 compatibility | Check each library at install time |
 
 ## 17. Rejected alternatives (v1.5; interview material)
