@@ -22,9 +22,10 @@ COLLECTION = "score_trends"
 JOB = "score_trends_w1"
 
 W1_BATCH_SIZE = 10
-LONG_WINDOW_DAYS = 40          # a w1 window longer than this gets a batch of its own
+W1_MAX_UNION_DAYS = 40         # a batch's union window may not be wider than this; a longer w1 stands alone
 TASK_REQUEST_CAP = 1100        # for the whole task, pilot included
-PILOT_RATIO_LIMIT = 1.3        # stop if records per batch exceed 1.3x the estimate
+STOP_RATIO_LIMIT = 1.15        # stop if actual / predicted records exceed this ...
+STOP_MIN_BATCHES = 10          # ... once at least this many batches are done
 MAX_PAGES = 30
 DAY = timedelta(days=1)
 
@@ -43,20 +44,34 @@ query ($ids: [Int], $from: Int, $to: Int, $page: Int) {
 
 # --- Batching ----------------------------------------------------------------
 
-def make_w1_batches(candidates, size=W1_BATCH_SIZE):
-    """Group candidates into batches by w1 start: sorted, chunks of `size`, long windows alone.
+def make_w1_batches(candidates, size=W1_BATCH_SIZE, max_union_days=W1_MAX_UNION_DAYS):
+    """Group candidates into batches by w1 start.
 
-    Returns a list of lists of candidate docs. Normal batches come first (in start order), then
-    one batch per show whose w1 is longer than LONG_WINDOW_DAYS, so a long window cannot
-    stretch the union window of ten other shows.
+    Shows are sorted by w1 start. A new batch starts when the current one has `size` shows OR
+    adding the next show would make the batch's union window wider than `max_union_days`.
+    Why the width cap: with releasing: true AniList returns a record for every AIRING day inside
+    the union window, so a wide window downloads many rows we then trim away.
+    A show whose own w1 window is longer than `max_union_days` stands alone, after the normal batches.
     """
     def start(doc):
         return (doc["trend_windows"]["w1"]["from"], doc["_id"])
 
+    def width(doc_or_batch):
+        batch = doc_or_batch if isinstance(doc_or_batch, list) else [doc_or_batch]
+        return markers.window_days(union_window(batch))
+
     ordered = sorted(candidates, key=start)
-    normal = [d for d in ordered if markers.window_days(d["trend_windows"]["w1"]) <= LONG_WINDOW_DAYS]
-    long_ones = [d for d in ordered if markers.window_days(d["trend_windows"]["w1"]) > LONG_WINDOW_DAYS]
-    batches = [normal[i:i + size] for i in range(0, len(normal), size)]
+    long_ones = [d for d in ordered if width(d) > max_union_days]
+    batches, current = [], []
+    for doc in (d for d in ordered if width(d) <= max_union_days):
+        trial = current + [doc]
+        if current and (len(trial) > size or width(trial) > max_union_days):
+            batches.append(current)
+            current = [doc]
+        else:
+            current = trial
+    if current:
+        batches.append(current)
     return batches + [[d] for d in long_ones]
 
 
@@ -71,6 +86,57 @@ def estimate_batch_records(batch):
     lower = sum(markers.window_days(d["trend_windows"]["w1"]) for d in batch)
     upper = len(batch) * markers.window_days(union_window(batch))
     return lower, upper
+
+
+def airing_period(doc):
+    """(first, last) day a show has releasing records: the day after episode 1 to the finale day."""
+    ep1 = doc["markers"]["schedule"]["ep1"]
+    first = (ep1 if ep1 is not None else doc["trend_windows"]["w1"]["from"] + DAY) + DAY
+    w2 = doc["trend_windows"].get("w2")
+    last = (w2["from"] + DAY) if w2 else doc["trend_windows"]["w1"]["to"]  # w2 starts one day before the finale
+    return first, last
+
+
+def overlap_days(from_a, to_a, from_b, to_b):
+    """Number of days two windows share (both ends included); 0 if they do not overlap."""
+    return max(0, (min(to_a, to_b) - max(from_a, from_b)).days + 1)
+
+
+def predict_batch_records(batch):
+    """Predict the raw records AniList returns for a batch (the airing-overlap model).
+
+    With releasing: true, AniList returns one record per show per AIRING day inside the batch's
+    union window, so for each show: union window overlap airing period. Checked against six real
+    batches, it was within 6% of the real numbers.
+    """
+    union = union_window(batch)
+    return sum(overlap_days(union["from"], union["to"], *airing_period(doc)) for doc in batch)
+
+
+def predicted_requests(records):
+    """Requests a batch needs for `records` rows: 50 per page, plus one extra empty page when the
+    count is an exact multiple of 50 (a full page still says hasNextPage). Real batches matched this."""
+    return records // 50 + 1
+
+
+def should_stop(actual_total, predicted_total, batches_done):
+    """Stop rule: after STOP_MIN_BATCHES batches, stop if actual / predicted exceeds STOP_RATIO_LIMIT.
+
+    Returns (stop, ratio); ratio is None while there is nothing to compare.
+    """
+    if predicted_total <= 0:
+        return False, None
+    ratio = actual_total / predicted_total
+    return batches_done >= STOP_MIN_BATCHES and ratio > STOP_RATIO_LIMIT, ratio
+
+
+def is_binge(doc):
+    """True for a show released all at once: start date equals end date, or M(1) equals M(final)."""
+    start, end = markers.day_from_fuzzy(doc.get("start_date")), markers.day_from_fuzzy(doc.get("end_date"))
+    if start is not None and start == end:
+        return True
+    schedule = doc["markers"]["schedule"]
+    return schedule["ep1"] is not None and schedule["ep1"] == schedule["final"]
 
 
 # --- Fetching (the one place that talks to AniList) ---------------------------

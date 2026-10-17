@@ -162,3 +162,103 @@ def test_ep3_snapshot_check_covers_each_reason():
     assert trends.ep3_snapshot_check([snap(m4, score=80)], m3, m4) == (False, "no_scored_record")           # on M(4)
     assert trends.ep3_snapshot_check([snap(m4 - 3 * DAY, score=80)], m3, m4) == (True, "ok")                # window edge
     assert trends.ep3_snapshot_check([snap(m4 - DAY, releasing=False)], m3, m4) == (False, "no_scored_record")
+
+
+# --- the 40-day union cap -------------------------------------------------------------
+
+def test_a_batch_closes_when_the_next_show_would_widen_the_union_past_40_days():
+    base = utc_day(2018, 10, 1)
+    # 24-day windows starting every 8 days: two shows span 32 days, three would span 40 days + ... check the cap
+    docs = [candidate(n, base + 8 * n * DAY, 24) for n in range(6)]
+    batches = trends.make_w1_batches(docs)
+    for batch in batches:
+        assert markers.window_days(trends.union_window(batch)) <= trends.W1_MAX_UNION_DAYS
+    assert [len(b) for b in batches] == [3, 3]  # 3 shows span 8+8+24 = 40 days; a 4th would make 48
+    assert trends.W1_MAX_UNION_DAYS == 40
+
+
+def test_size_still_caps_a_batch_at_10_when_the_union_is_narrow():
+    base = utc_day(2018, 10, 1)
+    docs = [candidate(n, base, 24) for n in range(23)]  # identical windows: width never grows
+    assert [len(b) for b in trends.make_w1_batches(docs)] == [10, 10, 3]
+
+
+def test_long_windows_stay_alone_and_order_is_stable_with_the_cap():
+    base = utc_day(2018, 10, 1)
+    docs = [candidate(n, base + 5 * n * DAY, 24) for n in range(8)] + [candidate(90, base, 60), candidate(91, base, 41)]
+    batches = trends.make_w1_batches(docs)
+    assert [b[0]["_id"] for b in batches[-2:]] == ["anilist:90", "anilist:91"] and all(len(b) == 1 for b in batches[-2:])
+    assert trends.make_w1_batches(docs) == trends.make_w1_batches(list(reversed(docs)))
+    flat = [d["trend_windows"]["w1"]["from"] for b in batches[:-2] for d in b]
+    assert flat == sorted(flat)
+
+
+# --- the airing-overlap model, checked against six real batches ------------------------
+
+def pilot_batches():
+    fixture = load_fixture("trend_pilot_batches.json")
+    parse = lambda text: None if text is None else datetime.fromisoformat(text)
+    batches = []
+    for entry in fixture["batches"]:
+        shows = [{"_id": s["_id"],
+                  "trend_windows": {"w1": {"from": parse(s["w1"]["from"]), "to": parse(s["w1"]["to"])},
+                                    "w2": {"from": parse(s["w2_from"]), "to": parse(s["w2_from"])}},
+                  "markers": {"schedule": {"ep1": parse(s["ep1"])}}} for s in entry["shows"]]
+        batches.append((shows, entry["actual_records"]))
+    return batches
+
+
+def test_the_model_matches_each_of_the_six_real_batches_within_10_percent():
+    batches = pilot_batches()
+    assert len(batches) == 6
+    for shows, actual in batches:
+        predicted = trends.predict_batch_records(shows)
+        assert abs(predicted - actual) / actual <= 0.10, (predicted, actual)
+    total_predicted = sum(trends.predict_batch_records(shows) for shows, _ in batches)
+    assert abs(total_predicted - 1771 - 336) / (1771 + 336) <= 0.05  # all six together
+
+
+def test_predicted_requests_match_the_real_request_counts():
+    # real batches: (records returned, requests used): 336 -> 7, 217 -> 5, 339 -> 7, 550 -> 12, 350 -> 8, 315 -> 7
+    for records, requests_used in [(336, 7), (217, 5), (339, 7), (550, 12), (350, 8), (315, 7)]:
+        assert trends.predicted_requests(records) == requests_used
+    assert trends.predicted_requests(0) == 1
+
+
+def test_airing_period_runs_from_the_day_after_episode_1_to_the_finale_day():
+    base = utc_day(2018, 10, 5)
+    doc = {"trend_windows": {"w1": {"from": base - DAY, "to": base + 30 * DAY},
+                             "w2": {"from": base + 76 * DAY, "to": base + 87 * DAY}},
+           "markers": {"schedule": {"ep1": base}}}
+    assert trends.airing_period(doc) == (base + DAY, base + 77 * DAY)
+    doc["markers"]["schedule"]["ep1"] = None  # fallback: w1 starts one day before the start date
+    assert trends.airing_period(doc)[0] == base + DAY
+    assert trends.overlap_days(base, base + 9 * DAY, base + 5 * DAY, base + 20 * DAY) == 5
+    assert trends.overlap_days(base, base + 2 * DAY, base + 5 * DAY, base + 6 * DAY) == 0
+
+
+# --- the model-based stop rule ---------------------------------------------------------------
+
+def test_stop_rule_waits_for_ten_batches_then_stops_above_1_15():
+    assert trends.STOP_RATIO_LIMIT == 1.15 and trends.STOP_MIN_BATCHES == 10
+    assert trends.should_stop(2000, 1000, 9) == (False, 2.0)   # far over, but fewer than 10 batches
+    assert trends.should_stop(1160, 1000, 10) == (True, 1.16)
+    assert trends.should_stop(1150, 1000, 10) == (False, 1.15)  # exactly 1.15 is allowed
+    assert trends.should_stop(900, 1000, 50) == (False, 0.9)
+    assert trends.should_stop(5, 0, 50) == (False, None)
+
+
+# --- binge releases ------------------------------------------------------------------------------
+
+def test_binge_means_start_equals_end_or_the_first_and_last_marker_coincide():
+    base = utc_day(2018, 10, 18)
+    full = {"year": 2018, "month": 10, "day": 18}
+    nothing = {"ep1": None, "final": None}
+    assert trends.is_binge({"start_date": full, "end_date": dict(full), "markers": {"schedule": nothing}}) is True
+    assert trends.is_binge({"start_date": full, "end_date": {"year": 2018, "month": 12, "day": 20},
+                            "markers": {"schedule": {"ep1": base, "final": base + 70 * DAY}}}) is False
+    assert trends.is_binge({"start_date": None, "end_date": None,
+                            "markers": {"schedule": {"ep1": base, "final": base}}}) is True
+    assert trends.is_binge({"start_date": {"year": 2018, "month": 10, "day": None},
+                            "end_date": {"year": 2018, "month": 10, "day": None},
+                            "markers": {"schedule": nothing}}) is False  # partial dates prove nothing
