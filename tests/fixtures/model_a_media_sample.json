@@ -1,0 +1,23 @@
+{
+ "_note": "HAND-MADE season-listing media for tests (not real data). Show 5001 is eligible; show 5002 fails several rules.",
+ "media": [
+  {"id": 5001, "idMal": 9001, "title": {"romaji": "Test Show One", "english": "Test Show One EN"},
+   "format": "TV", "status": "FINISHED", "episodes": 12, "duration": 24,
+   "season": "FALL", "seasonYear": 2020,
+   "startDate": {"year": 2020, "month": 10, "day": 4}, "endDate": {"year": 2020, "month": 12, "day": 20},
+   "source": "MANGA", "countryOfOrigin": "JP", "isAdult": false, "genres": ["Action", "Fantasy"],
+   "studios": {"nodes": [{"name": "Studio A"}]},
+   "averageScore": 81, "popularity": 45000,
+   "relations": {"edges": [
+     {"relationType": "SEQUEL", "node": {"id": 5003, "type": "ANIME", "format": "TV"}},
+     {"relationType": "ADAPTATION", "node": {"id": 777, "type": "MANGA", "format": "MANGA"}}]}},
+  {"id": 5002, "idMal": null, "title": {"romaji": "Test Show Two", "english": null},
+   "format": "ONA", "status": "RELEASING", "episodes": null, "duration": null,
+   "season": "SUMMER", "seasonYear": 2026,
+   "startDate": {"year": 2026, "month": 7, "day": null}, "endDate": {"year": null, "month": null, "day": null},
+   "source": null, "countryOfOrigin": "JP", "isAdult": false, "genres": [],
+   "studios": {"nodes": []},
+   "averageScore": null, "popularity": 2100,
+   "relations": {"edges": []}}
+ ]
+}
