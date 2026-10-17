@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-17
 - **Task:** TASK 007 from the instructor (new instructor chat, spec v1.5 → v1.6)
-- **Status:** Built and verified by the developer on one season in the test database. **Waiting on Nirav's acceptance run** (the full 32-season collection and the 30-show probe). The real per-season counts and probe verdicts come from that run.
+- **Status:** Done. All 7 acceptance checks passed on Nirav's machine (2026-10-17).
 
 ## Summary
 
@@ -43,6 +43,39 @@
 
 **Fall 2018 probe detail:** 8 shows have every episode in the schedule. One show (`episodes` 12) has only 8 rows and is missing episodes 1–4; one (`episodes` 13) has a single row (the finale only). So the schedule has the final episode for 10/10 but eps 1–4 for 8/10. That is why TASK 008 should not rely on schedules alone.
 
+## Acceptance run by Nirav (PowerShell, 2026-10-17)
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `python -m pytest -q` | `67 passed, 1 deselected in 1.58s` ✅ |
+| 2 | `collect_model_a_candidates --dry-run` | 32 seasons `FALL 2018 ... SUMMER 2026`, budget line, "0 requests" ✅ |
+| 3 | `collect_model_a_candidates` | all 32 seasons; **1,665 listed, 1,431 eligible (86%)**; **55 requests** (cap 100), 0 × HTTP 429, 0 retries ✅ |
+| 4 | same again | `32/32 seasons already collected, 0 requests` ✅ |
+| 5 | `probe_airing_schedules` | 30 shows, **9 requests** (cap 15), 0 × 429; Fall 2018 8/10 complete, Winter 2022 9/10, Summer 2026 9/10 ✅ |
+| 6 | `check_db` | `model_a_candidates` stored; `episode_three` **16.94 MB (3.3%)**, was 15.20 MB ✅ |
+| 7 | `git log -5` | the four TASK 007 commits ✅ |
+
+### Eligible per season (listed / eligible)
+
+2018 FALL 50/40 · 2019 WINTER 38/34, SPRING 37/31, SUMMER 46/33, FALL 54/45 · 2020 WINTER 41/35, SPRING 47/38, SUMMER 24/18, FALL 45/37 · 2021 WINTER 55/46, SPRING 57/43, SUMMER 39/34, FALL 54/44 · 2022 WINTER 40/33, SPRING 56/43, SUMMER 52/43, FALL 53/44 · 2023 WINTER 61/53, SPRING 56/49, SUMMER 52/43, FALL 73/62 · 2024 WINTER 51/47, SPRING 60/55, SUMMER 52/51, FALL 62/56 · 2025 WINTER 51/47, SPRING 55/47, SUMMER 64/58, FALL 54/51 · 2026 WINTER 62/56, SPRING 63/60, SUMMER 61/55. **Total 1,665 / 1,431.**
+
+### Exclusion reasons (a show can have several; percentages of 1,665 listed)
+
+`episodes_out_of_range` 170 (10%) · `duration_short` 101 (6%) · `not_finished` 10 (1%) · `episodes_unknown` 5 · `duration_unknown` 2. No `format`, `country` or `adult` exclusions (the listing query already filters those).
+
+**Why 1,431 is above the task's "roughly 800–1,400":** that range was an estimate of *usable* shows. 1,431 is only the candidate stage, before the "popularity ≥ 2,000 at episode 3" filter, before marker/snapshot exclusions and before the pending rule (finale + 9 days). TASK 003 measured about 90% of shows usable, so about 1,290 is a realistic final number. The count also rises over time (about 34 eligible per season in 2019, about 55 in 2025-26) because more shows pass today's popularity pre-filter.
+
+### Airing-probe verdicts (30 shows; 26 complete, 4 with gaps, 0 missing)
+
+| Season | Complete | Gaps | Eps 1–4 present | Final episode present |
+|---|---|---|---|---|
+| Fall 2018 | 8 | 2 | 8/10 | 10/10 |
+| Winter 2022 | 9 | 1 | 9/10 | 9/10 |
+| Summer 2026 | 9 | 1 | 9/10 | 10/10 |
+| **All** | **26** | **4** | **26/30 (87%)** | **29/30 (97%)** |
+
+The 4 gaps: one show with 8 of 12 rows (eps 1–4 missing), one with only its finale row, one with a single row (10 episodes, neither the early episodes nor the finale), and one with 11 of 12 rows (one early episode missing). Three of the four lack early episodes, which are exactly the ones M(3) and M(4) need.
+
 ## Findings worth knowing
 
 1. **`hasNextPage` is true on a full page** even when nothing follows. Fall 2018 has exactly 50 qualifying shows, so page 2 came back empty. A season whose count is a multiple of 50 costs one extra request. The data is not truncated (page 1's last show had popularity 2,766).
@@ -66,7 +99,7 @@
 ## AniList requests
 
 - **Developer: 13** (listing check 2, probe check 3, pagination debug 2, fixture 1, database test 2, probe script 3).
-- **Expected for Nirav's run:** about 64 (32 seasons × 2) + about 9 = ~73, so ~86 in total against the hard cap of 120. If the listing needs more pages, the collector stops itself at 100.
+- **Nirav's run: 64** (listing 55 + probe 9). **Total 77 of the 120 hard cap.** No HTTP 429 and no retries in either run.
 
 ## Teach Nirav (covered in the chat)
 
@@ -76,5 +109,10 @@
 
 ## Next
 
-- Nirav runs the acceptance commands and pastes the output; the real numbers are then added here.
-- Recommendation for TASK 008 comes after that run.
+- The instructor rules on the two questions below and sends TASK 008 (markers).
+- **Recommendation for TASK 008:** use the airing schedule as the primary source of marker days and the trend episode markers as the fallback (M(n) is already defined as the earliest of the two). About 13% of probed schedules (4 of 30) lack early episodes, so shows missing both sources for episode 3 or 4 should be excluded with a recorded reason, not guessed.
+
+## Questions for the instructor
+
+1. With 4 of 30 sampled schedules lacking early episodes, should a show whose schedule lacks M(3) or M(4) be rescued from trend markers, or excluded?
+2. hasNextPage is true on a full page: accept the occasional extra request, or stop when a page returns fewer rows than perPage?
