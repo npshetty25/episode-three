@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-18
 - **Task:** TASK 009 from the instructor (spec v1.7 → v1.8)
-- **Status:** Pilot stopped by the 1.3× rule (2026-10-18). The instructor ruled (continuation, below): 40-day union cap, model-based stop rule. **Built and tested (114 offline tests); waiting on Nirav's full w1 run** and the checks that follow it.
+- **Status:** Done (2026-10-19). Full w1 collection complete: all 1,431 ready shows have a `w1_status`. All acceptance checks passed; check 4 (second run) hit a Jio DNS timeout on Nirav's machine and was re-run by the developer (0 requests).
 
 ## Summary
 
@@ -104,6 +104,45 @@ Requests already used: 47 (my 8 + the pilot's 39). The remaining shows need abou
 
 No requests were made in this continuation (0 developer requests); the task total stays at the 47 already used.
 
+## Acceptance run by Nirav (PowerShell, 2026-10-19)
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `python -m pytest -q` | `114 passed, 1 deselected in 1.47s` ✅ |
+| 2 | `--dry-run` | 1,371 shows → 204 batches, predicted 35,602 records / 818 requests, "0 requests" ✅ |
+| 3 | `collect_score_trends --window w1` | all 204 batches, **792 requests** (earlier runs 46, total 838 of 1,100), **32.9 min**, 0 × HTTP 429, 4 retries (network errors, recovered). **Actual 33,427 vs predicted 35,602 records: ratio 0.939**; cumulative ratio stayed at 0.94–0.97 throughout, so the stop rule never fired. 0 duplicates removed ✅ |
+| 4 | same again | ⚠️ failed on Nirav's machine with a Jio DNS timeout to Atlas (friendly message, "AniList requests used: 0"). **Re-run by the developer: "all shows already collected, 0 requests"** ✅ |
+| 5 | `check_trend_markers` | see below ✅ |
+| 6 | `check_db` | `episode_three` **20.98 MB (4.1%)**, was 17.51 MB (+3.5 MB) ✅ |
+| 7 | `git log -4` | the TASK 009 commits ✅ |
+
+**Requests for the whole task:** developer 8 (1 introspection + 7) + pilot 39 + full run 792 = **839 of 1,100**.
+
+### The model held
+
+Actual records were 6% below the prediction (33,427 vs 35,602). The model over-predicts shows that have no trend records at all (it assumes every airing day has a record), e.g. batch 190: 52 actual vs 230 predicted. The 1,371-show plan was predicted at 818 requests and cost 792 (3% under).
+
+### Collected vs no_records
+
+- **w1 status of the 1,431 ready shows: collected 1,377, no_records 54** (3.8%). `score_trends`: 1,431 documents; snapshots per show min 0 / median 22 / max 105.
+- **52 of the 54 are ONAs and 2 are TV.** 32% of all 162 ONAs have no records, against 0.2% of the 1,269 TV shows.
+- **48 of the 54 are binge releases** (start date = end date, or M(1) = M(final)); 38 used the start-date fallback window. Binge status does not always mean no records: 19 of the 110 collected ONAs are binge too.
+- **The 6 not-binge ones:** three ONAs with missing schedule data (`100780` has no finale row, `119964` no ep 1, `146722` neither; `146646` no finale row), and two ordinary weekly TV shows: `130402` (Jan–Mar 2021) and `169228` (Apr–Jun 2026; its w1 window, Apr 9–18, lies inside the known AniList outage of 2026-04-03 → 04-19). `130402` has no explanation yet.
+- **ids (format, episodes):** 101500 (ONA 11), 105807 (12), 105200 (10), 100663 (13), 100891 (12), 111131 (12), 110686 (9), 100780 (12), 108598 (12), 107067 (12), 108522 (13), 112686 (12), 119964 (8), 112357 (10), 125428 (12), **130402 (TV 12)**, 127399 (12), 124195 (12), 138060 (9), 109946 (13), 127619 (10), 125447 (11), 120377 (10), 146722 (26), 125440 (8), 153930 (12), 151803 (12), 135660 (8), 150653 (12), 154983 (10), 135429 (8), 163137 (10), 147729 (12), 146646 (27), 146638 (12), 159926 (15), 99088 (8), 170206 (8), 130706 (12), 155015 (8), 177106 (8), 169692 (16), 177814 (8), 184560 (14), 136880 (12), 150654 (18), 177887 (12), 186043 (12), 184642 (9), 202955 (20), 187267 (12), 176509 (13), **169228 (TV 14)**, 213847 (8); every other id is an ONA.
+
+### Marker comparison on the full set (1,377 collected shows; 0 requests)
+
+- **Trend markers present** (a record with `episode = n` inside w1): ep1 54, ep2 1,233, ep3 1,302, ep4 1,329.
+- **Trend minus schedule, in days (3,805 comparable markers): 99.4% within ±1** (3,782); exactly equal 85.4% (3,251); −1 day 13.6% (519, the 00:00-JST double-marking); beyond ±1: 23 markers (0.6%): −21 ×1, −8 ×2, −7 ×10, −6 ×5, −2 ×3, +2 ×1, +7 ×1 (break-week schedule/trend disagreements). Per episode: ep1 98.0% (49 compared), ep2 99.5%, ep3 99.4%, ep4 99.3%.
+- **Fallback shows:** 77; **rescued by trend markers (eps 3 AND 4): 42 (55%)**; all of eps 1–4: 3.
+- **Episode-3 snapshot check** (M(n) = earliest of schedule and trend marker): **ok 1,311 of 1,377 (95.2%)**; lacking 66: `no_scored_record` 30, `m3_not_before_m4 (binge)` 19, `no_m4` 7, `m3_not_before_m4` 6, `no_m3` 4. By source: schedule-based w1: ok 1,270, no_scored_record 24, m3_not_before_m4 6; fallback w1: ok 41, binge 19, no_m4 7, no_scored_record 6, no_m3 4.
+- **`m1_unknown`: 57 of 1,377** (4.1%): ep1 features null, show kept.
+- (The 54 `no_records` shows are not in these 1,377; they cannot give an ep3 snapshot either, so the model will lack at least 66 + 54 = 120 shows, about 8% of the 1,431.)
+
+### Projection for w2 (same model; 0 requests)
+
+171 batches (finale-date order, 10 per batch, 40-day cap, no releasing filter: one record per show-day of the union window), **29,173 records, about 689 requests.** Total task cost would then stay near 839 + 689 ≈ 1,528 across TASK 009 and the w2 task, but w2 gets its own budget.
+
 ## Findings
 
 1. **The docs site blocks scripts** (HTTP 403), so enum values and argument types come from GraphQL introspection instead.
@@ -140,7 +179,7 @@ None live: no 429, no retries, no duplicates, no Atlas refusals during my tests.
 
 ## Next
 
-- Nirav runs the full w1 collection and the remaining acceptance steps (second run, `check_trend_markers`, `check_db`, `git log`); the real totals are added here.
+- The instructor sends the next task (w2 collection, then the feature pipeline). **Recommendation:** collect w2 with the same batching (finale date, 40-day cap, about 689 requests); skip the 54 `no_records` shows for w2 (no w1 means no features); decide in TASK 010 whether ONAs with no daily record are excluded as a class.
 - (Questions 1–5 below were answered by the instructor's ruling: width cap 40 days, model-based stop rule, binge → M(3) < M(4), m1_unknown keeps the show, w2 one contiguous window.)
 
 4. **Stop rule yardstick:** the 1.3× rule compares with the own-window (lower) estimate, which the model shows is too low whenever a union window is wide. Continue as built (about 950 requests in total), or cap batches by union width (about 40 days, about 900 in total), and which yardstick should the rule use from now on?
