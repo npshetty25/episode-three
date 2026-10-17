@@ -48,7 +48,7 @@ def main():
 
     shows = list(database[candidates.COLLECTION].find(
         {"eligible": True, "collection_status": "ready"},
-        {"markers": 1, "marker_source": 1, "w1_status": 1}))
+        {"markers": 1, "marker_source": 1, "w1_status": 1, "start_date": 1, "end_date": 1}))
     snapshots_by_id = {t["_id"]: t.get("snapshots_w1", [])
                        for t in database[trends.COLLECTION].find({}, {"snapshots_w1": 1})}
     collected = [s for s in shows if s.get("w1_status") == "collected"]
@@ -58,7 +58,7 @@ def main():
 
     differences = {n: [] for n in (1, 2, 3, 4)}
     present = Counter()
-    fallback = rescued = rescued_all_four = 0
+    fallback = rescued = rescued_all_four = m1_unknown = 0
     reasons = Counter()
     reasons_by_source = {"schedule": Counter(), "fallback_start_date": Counter()}
     for show in collected:
@@ -77,9 +77,14 @@ def main():
                 rescued += 1
             if all(trend_days[n] is not None for n in (1, 2, 3, 4)):
                 rescued_all_four += 1
+        m1 = trends.earliest(schedule["ep1"], trend_days[1])
+        if m1 is None:
+            m1_unknown += 1  # ep1 features become null, but the show is kept
         m3 = trends.earliest(schedule["ep3"], trend_days[3])
         m4 = trends.earliest(schedule["ep4"], trend_days[4])
         ok, reason = trends.ep3_snapshot_check(snapshots, m3, m4)
+        if not ok and trends.is_binge(show):
+            reason = "m3_not_before_m4 (binge)"  # released all at once: no M(3) < M(4)
         reasons[reason] += 1
         reasons_by_source.setdefault(source, Counter())[reason] += 1
 
@@ -89,10 +94,12 @@ def main():
     print(f"\nFallback shows (w1 from the start date): {fallback}")
     print(f"  rescued by trend markers (episodes 3 AND 4 both present): {rescued}; all of episodes 1-4: {rescued_all_four}")
     print("\nEpisode-3 snapshot check, M(n) = earliest of schedule and trend marker:")
-    for reason in ("ok", "no_scored_record", "m3_not_before_m4", "no_m3", "no_m4"):
-        print(f"  {reason:<18} {reasons[reason]:>5}")
+    for reason in ("ok", "no_scored_record", "m3_not_before_m4", "m3_not_before_m4 (binge)", "no_m3", "no_m4"):
+        print(f"  {reason:<26} {reasons[reason]:>5}")
     lacking = len(collected) - reasons["ok"]
     print(f"  shows lacking an ep3 snapshot: {lacking} of {len(collected)}")
+    print(f"\nm1_unknown (no M(1) from the schedule or the trend records; ep1 features null, show kept): "
+          f"{m1_unknown} of {len(collected)}")
     for source, counter in reasons_by_source.items():
         if counter:
             print(f"    {source:<20} " + ", ".join(f"{k} {v}" for k, v in sorted(counter.items())))
