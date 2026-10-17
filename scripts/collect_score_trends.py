@@ -112,6 +112,7 @@ def main():
         print("Dry run: 0 requests.")
         return
 
+    database[trends.COLLECTION].create_index([("season_year", 1), ("season", 1)])  # does nothing if it exists
     started = datetime.now(timezone.utc)
     run_id = f"{trends.JOB}:{started:%Y-%m-%dT%H:%M:%SZ}"
     began = time.monotonic()
