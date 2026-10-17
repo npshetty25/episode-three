@@ -262,3 +262,22 @@ def test_binge_means_start_equals_end_or_the_first_and_last_marker_coincide():
     assert trends.is_binge({"start_date": {"year": 2018, "month": 10, "day": None},
                             "end_date": {"year": 2018, "month": 10, "day": None},
                             "markers": {"schedule": nothing}}) is False  # partial dates prove nothing
+
+
+# --- the w2 projection ------------------------------------------------------------------------------
+
+def finale_doc(number, finale_day):
+    return {"_id": f"anilist:{number}",
+            "trend_windows": {"w2": {"from": finale_day - DAY, "to": finale_day + 10 * DAY}}}
+
+
+def test_w2_projection_batches_by_finale_date_with_no_releasing_filter():
+    base = utc_day(2019, 1, 1)
+    docs = [finale_doc(n, base + n * DAY) for n in range(10)]  # finales on 10 consecutive days
+    batches, records, requests_needed = trends.project_w2(docs)
+    assert batches == 1
+    assert records == 10 * 21  # union = [base-1, base+9+10]: 21 days, every day has a record for every show
+    assert requests_needed == 210 // 50 + 1
+    far_apart = docs + [finale_doc(99, base + 200 * DAY)]
+    assert trends.project_w2(far_apart)[0] == 2  # a finale 200 days later cannot join the batch (width cap)
+    assert trends.project_w2([]) == (0, 0, 0)

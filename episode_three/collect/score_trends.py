@@ -75,9 +75,9 @@ def make_w1_batches(candidates, size=W1_BATCH_SIZE, max_union_days=W1_MAX_UNION_
     return batches + [[d] for d in long_ones]
 
 
-def union_window(batch):
+def union_window(batch, key="w1"):
     """The window covering every show in the batch: [earliest start, latest end]."""
-    windows = [d["trend_windows"]["w1"] for d in batch]
+    windows = [d["trend_windows"][key] for d in batch]
     return {"from": min(w["from"] for w in windows), "to": max(w["to"] for w in windows)}
 
 
@@ -137,6 +137,33 @@ def is_binge(doc):
         return True
     schedule = doc["markers"]["schedule"]
     return schedule["ep1"] is not None and schedule["ep1"] == schedule["final"]
+
+
+def make_w2_batches(candidates, size=W1_BATCH_SIZE, max_union_days=W1_MAX_UNION_DAYS):
+    """Projection only (w2 is collected in a later task): batches by finale date, same size and width cap."""
+    ordered = sorted(candidates, key=lambda d: (d["trend_windows"]["w2"]["from"], d["_id"]))
+    batches, current = [], []
+    for doc in ordered:
+        trial = current + [doc]
+        if current and (len(trial) > size or markers.window_days(union_window(trial, "w2")) > max_union_days):
+            batches.append(current)
+            current = [doc]
+        else:
+            current = trial
+    if current:
+        batches.append(current)
+    return batches
+
+
+def project_w2(candidates):
+    """Projected w2 cost: (batches, records, requests).
+
+    w2 has no releasing filter, so AniList returns a record for EVERY show-day of the union window
+    (before the finale the records are releasing, after it they are not): records = shows x union days.
+    """
+    batches = make_w2_batches(candidates)
+    records = [len(b) * markers.window_days(union_window(b, "w2")) for b in batches]
+    return len(batches), sum(records), sum(predicted_requests(r) for r in records)
 
 
 # --- Fetching (the one place that talks to AniList) ---------------------------

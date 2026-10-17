@@ -2,15 +2,17 @@
 
 Run from the episode-three folder:
     python -m scripts.collect_score_trends --window w1 --dry-run          # 0 requests: the plan
-    python -m scripts.collect_score_trends --window w1 --limit-batches 5  # the pilot
-    python -m scripts.collect_score_trends --window w1                    # the full run (resumable)
+    python -m scripts.collect_score_trends --window w1                    # the collection (resumable)
+    python -m scripts.collect_score_trends --window w1 --limit-batches 5  # a small trial
     python -m scripts.collect_score_trends --window w1 --force            # collect everything again
 
 Shows that already have a w1 status are skipped, so a re-run costs 0 requests. The request cap
-counts every earlier run of this script (read from sync_runs), so the pilot is included.
+counts every earlier run of this script (read from sync_runs).
+
+Stop rule: after every batch the script compares the records AniList really returned with what the
+airing-overlap model predicted; after 10 batches it stops if actual / predicted is above 1.15.
 """
 import argparse
-import math
 import sys
 import time
 from collections import Counter
@@ -39,35 +41,35 @@ def load_todo(database, force):
 
 
 def requests_already_used(database):
-    """Requests spent by earlier runs of this script (the pilot counts toward the cap)."""
+    """Requests spent by earlier runs of this script (they count toward the cap)."""
     return sum(run.get("requests_used", 0) for run in database["sync_runs"].find({"job": trends.JOB}))
 
 
-def pages_for(records):
-    return max(1, math.ceil(records / 50))
-
-
 def print_plan(batches, previous):
-    isolated = sum(1 for b in batches if len(b) == 1 and markers.window_days(
-        b[0]["trend_windows"]["w1"]) > trends.LONG_WINDOW_DAYS)
-    widths = [markers.window_days(trends.union_window(b)) for b in batches]
-    dist = markers.length_distribution(widths)
-    lower = sum(pages_for(trends.estimate_batch_records(b)[0]) for b in batches)
-    upper = sum(pages_for(trends.estimate_batch_records(b)[1]) for b in batches)
-    print(f"{sum(len(b) for b in batches)} shows -> {len(batches)} batches "
-          f"({len(batches) - isolated} normal, {isolated} long-window shows alone)")
+    long_alone = sum(1 for b in batches if len(b) == 1 and markers.window_days(
+        b[0]["trend_windows"]["w1"]) > trends.W1_MAX_UNION_DAYS)
+    widths = markers.length_distribution([markers.window_days(trends.union_window(b)) for b in batches])
+    predicted = [trends.predict_batch_records(b) for b in batches]
+    requests_needed = sum(trends.predicted_requests(r) for r in predicted)
+    print(f"{sum(len(b) for b in batches)} shows to collect -> {len(batches)} batches "
+          f"({len(batches) - long_alone} normal, {long_alone} long-window shows alone)")
     print(f"Union-window width in days (min / median / p95 / max): "
-          f"{dist['min']} / {dist['median']:g} / {dist['p95']} / {dist['max']}")
-    print(f"Planned minimum requests (one page per batch): {len(batches)}")
-    print(f"Estimated requests from the window lengths: {lower} (own windows) to {upper} (union windows)")
-    print(f"Cap: {trends.TASK_REQUEST_CAP} for the whole task; earlier runs used {previous}")
+          f"{widths['min']} / {widths['median']:g} / {widths['p95']} / {widths['max']} "
+          f"(cap {trends.W1_MAX_UNION_DAYS} days per batch)")
+    print(f"Predicted records: {sum(predicted):,}")
+    print(f"Predicted requests: {requests_needed} (at least {len(batches)}, one page per batch)")
+    print(f"Cap: {trends.TASK_REQUEST_CAP} for the whole task; earlier runs used {previous}; "
+          f"after this run about {previous + requests_needed}")
 
 
 def print_summary(database):
     docs = list(database[candidates.COLLECTION].find(
-        {"eligible": True, "collection_status": "ready"}, {"w1_status": 1}))
+        {"eligible": True, "collection_status": "ready"}, {"w1_status": 1, "format": 1, "episodes": 1}))
     status = Counter(d.get("w1_status", "not collected") for d in docs)
     print("\nw1 status of the ready shows: " + ", ".join(f"{k} {v}" for k, v in sorted(status.items())))
+    empty = [d for d in docs if d.get("w1_status") == "no_records"]
+    if empty:
+        print("no_records shows: " + ", ".join(f"{d['_id']} ({d['format']}, {d['episodes']} eps)" for d in empty))
     snapshots = [d.get("n_snapshots_w1", 0) for d in database[trends.COLLECTION].find({}, {"n_snapshots_w1": 1})]
     if snapshots:
         dist = markers.length_distribution(snapshots)
@@ -75,20 +77,18 @@ def print_summary(database):
               f"median {dist['median']:g} / max {dist['max']}")
 
 
-def print_w2_projection(database, density):
+def print_w2_projection(database):
     docs = list(database[candidates.COLLECTION].find(
         {"eligible": True, "collection_status": "ready"}, {"trend_windows": 1}))
-    est = markers.estimate_pages(docs, "w2")
-    print(f"\nProjected w2 budget: w2 has no releasing filter, so AniList returns a record for EVERY show-day "
-          f"(density 1, not the w1 density of {density:.2f}).")
-    print(f"  w2: {est['batches']} batches, {est['records_upper']:,} records on union windows "
-          f"-> about {est['pages_upper']} requests (floor {est['pages_lower']} if windows were exact).")
+    batches, records, requests_needed = trends.project_w2(docs)
+    print(f"\nProjected w2 (batched by finale date, no releasing filter, so one record per show-day of the "
+          f"union window): {batches} batches, {records:,} records, about {requests_needed} requests.")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Collect the daily score trends for a window.")
     parser.add_argument("--window", choices=["w1"], required=True, help="w1 = premiere to episode 4")
-    parser.add_argument("--limit-batches", type=int, help="the pilot: stop after this many batches")
+    parser.add_argument("--limit-batches", type=int, help="stop after this many batches (a small trial)")
     parser.add_argument("--dry-run", action="store_true", help="show the plan; 0 requests")
     parser.add_argument("--force", action="store_true", help="collect shows that already have a w1 status")
     args = parser.parse_args()
@@ -109,6 +109,7 @@ def main():
         batches = batches[:args.limit_batches]
     print_plan(batches, previous)
     if args.dry_run:
+        print_w2_projection(database)
         print("Dry run: 0 requests.")
         return
 
@@ -122,10 +123,8 @@ def main():
         if previous + anilist.stats["requests"] - requests_at_start >= trends.TASK_REQUEST_CAP:
             raise candidates.RequestBudgetExceeded(f"the cap of {trends.TASK_REQUEST_CAP} requests would be exceeded")
 
-    actual_total = lower_total = upper_total = duplicates_total = own_days = 0
-    done_shows = 0
+    actual_total = predicted_total = duplicates_total = done_shows = 0
     stop_reason = None
-    pilot = bool(args.limit_batches)
     for number, batch in enumerate(batches, 1):
         requests_before = anilist.stats["requests"]
         try:
@@ -142,42 +141,40 @@ def main():
         database[candidates.COLLECTION].bulk_write(
             [UpdateOne({"_id": d["_id"]}, {"$set": cand}) for d, (_, cand) in pairs], ordered=False)
 
-        lower, upper = trends.estimate_batch_records(batch)
-        actual_total, lower_total, upper_total = actual_total + len(rows), lower_total + lower, upper_total + upper
+        predicted = trends.predict_batch_records(batch)
+        actual_total, predicted_total = actual_total + len(rows), predicted_total + predicted
         duplicates_total += duplicates
-        own_days += lower
         done_shows += len(batch)
-        used = anilist.stats["requests"] - requests_at_start
+        stop, ratio = trends.should_stop(actual_total, predicted_total, number)
         database["sync_runs"].update_one({"_id": run_id}, {"$set": {
             "job": trends.JOB, "started_at": started, "batches_done": number, "batches_planned": len(batches),
-            "shows_done": done_shows, "records": actual_total, "duplicates": duplicates_total,
-            "requests_used": used}}, upsert=True)
-        if pilot or number % 10 == 0 or number == len(batches):
-            print(f"  batch {number}/{len(batches)}: {len(batch)} shows, {len(rows)} records "
-                  f"(estimate {lower} to {upper}), {anilist.stats['requests'] - requests_before} requests", flush=True)
-        if number == 5 and lower_total and actual_total / lower_total > trends.PILOT_RATIO_LIMIT:
-            stop_reason = (f"records per batch are {actual_total / lower_total:.2f}x the estimate "
-                           f"(limit {trends.PILOT_RATIO_LIMIT}x) after 5 batches")
+            "shows_done": done_shows, "records": actual_total, "predicted_records": predicted_total,
+            "duplicates": duplicates_total, "requests_used": anilist.stats["requests"] - requests_at_start}},
+            upsert=True)
+        if number % 10 == 0 or number == len(batches) or args.limit_batches:
+            print(f"  batch {number}/{len(batches)}: {len(batch)} shows, {len(rows)} records (predicted {predicted}), "
+                  f"{anilist.stats['requests'] - requests_before} requests; cumulative actual/predicted "
+                  f"{actual_total:,}/{predicted_total:,} = {ratio:.2f}", flush=True)
+        if stop:
+            stop_reason = (f"actual records are {ratio:.2f}x the model's prediction after {number} batches "
+                           f"(limit {trends.STOP_RATIO_LIMIT}x)")
             break
 
     used = anilist.stats["requests"] - requests_at_start
     database["sync_runs"].update_one({"_id": run_id}, {"$set": {
         "job": trends.JOB, "finished_at": datetime.now(timezone.utc), "requests_used": used}}, upsert=True)
-    runtime = time.monotonic() - began
-    print(f"\nRun: {done_shows} shows in {runtime / 60:.1f} min; AniList requests used: {used} "
-          f"(cap {trends.TASK_REQUEST_CAP}, earlier runs {previous}); HTTP 429s: {anilist.stats['http_429']}; "
-          f"retries: {anilist.stats['retries']}")
-    if lower_total:
-        print(f"Records: {actual_total:,} vs estimate {lower_total:,} (own windows) to {upper_total:,} (union windows): "
-              f"{actual_total / lower_total:.2f}x the lower estimate; duplicates removed: {duplicates_total}")
+    print(f"\nRun: {done_shows} shows in {(time.monotonic() - began) / 60:.1f} min; AniList requests used: {used} "
+          f"(earlier runs {previous}, total {previous + used} of {trends.TASK_REQUEST_CAP}); "
+          f"HTTP 429s: {anilist.stats['http_429']}; retries: {anilist.stats['retries']}")
+    if predicted_total:
+        print(f"Records: actual {actual_total:,} vs predicted {predicted_total:,} "
+              f"(ratio {actual_total / predicted_total:.3f}); duplicates removed: {duplicates_total}")
     print_summary(database)
-    if lower_total:
-        print_w2_projection(database, actual_total / own_days if own_days else 0)
+    print_w2_projection(database)
     if stop_reason:
-        print(f"\nSTOPPED: {stop_reason}. Paste this output to the instructor.")
-        sys.exit(3 if "x the estimate" in stop_reason else 2)
-    if pilot:
-        print("\nPilot finished. If records per batch are within 1.3x the estimate, run the full collection.")
+        print(f"\nSTOPPED: {stop_reason}. Run again to continue (finished batches are skipped); "
+              "paste this output to the instructor.")
+        sys.exit(3 if "x the model" in stop_reason else 2)
 
 
 if __name__ == "__main__":
