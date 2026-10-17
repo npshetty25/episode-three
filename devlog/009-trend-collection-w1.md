@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-18
 - **Task:** TASK 009 from the instructor (spec v1.7 → v1.8)
-- **Status:** Built and verified by the developer on one real batch. **Waiting on Nirav's acceptance run** (the 5-batch pilot, the full w1 collection, the marker comparison). The pilot numbers, final counts and request totals come from that run.
+- **Status:** **Paused at the pilot by the 1.3× stop rule** (the instructor's instruction). Pilot done and stored (50 shows); the full run, the marker comparison and the remaining checks wait for the instructor's ruling.
 
 ## Summary
 
@@ -47,6 +47,39 @@ There are **1,431 eligible shows**. In TASK 008 I first ran the marker script on
 
 **Reading the pilot batch:** about 48 records per request (336 / 7), so the cost is roughly records ÷ 48. At 1.15× the lower estimate (35,429 records) the full w1 collection is about 40,700 records, **about 850 requests**, inside the 1,100 cap.
 
+## Pilot run by Nirav (PowerShell, 2026-10-18): STOPPED by the 1.3× rule
+
+| Check | Result |
+|---|---|
+| `python -m pytest -q` | `105 passed, 1 deselected in 1.37s` ✅ |
+| `--dry-run` | 1,421 shows → 145 batches (142 normal + 3 long alone), union width 25 / 31 / 109 / 119 days, estimate 761 to 1,391, "earlier runs used 7" (my developer batch) ✅ |
+| `--limit-batches 5` | 50 shows, **1,771 records vs estimate 1,304 (own windows) to 2,340 (union windows) = 1.36× the lower estimate**, 39 requests in 1.4 min, 0 × 429, 0 retries, 0 duplicates. **STOPPED** (limit 1.3×) ✅ as designed |
+
+Per batch (records, estimate lower to upper, requests): 217 (240–250) 5 · 339 (253–380) 7 · **550 (286–920) 12** · 350 (246–410) 8 · 315 (279–380) 7. Status afterwards: collected 59, no_records 1, not collected 1,371; snapshots per show min 0 / median 22 / max 36.
+
+### Why 1.36×: an offline model of the real batches (0 requests)
+
+With `releasing: true`, AniList returns a record for every day a show is airing INSIDE the batch's union window, not only inside the show's own w1 window. A show airing for 12 weeks inside a 92-day union window returns up to 92 days of records, and we trim most of them away. So the right estimate is not "own-window days" (the lower bound) but: for each show, the overlap of the union window with the show's airing period (day after episode 1 to the finale).
+
+That model reproduces all six real batches (developer batch + pilot): predicted 357 / 227 / 349 / **549** / 360 / 322 vs actual **336 / 217 / 339 / 550 / 350 / 315** (within 6%). Against it the pilot is about 1.0×, not 1.36×. About a third of the downloaded rows are trimmed away (trimmed snapshots stored: 260 / 217 / 232 / 199 / 225 / 225).
+
+### Projection for the whole of w1 (model, 0 requests)
+
+| Batching | Batches | Records | Requests (all 1,431 shows) |
+|---|---|---|---|
+| As built (10 per batch, sorted by start) | 146 | 43,612 | **938** |
+| Union width capped at 50 days | 179 | 38,937 | 867 |
+| Union width capped at 40 days | 213 | 37,516 | 857 |
+| Union width capped at 35 days | 323 | 33,359 | 834 |
+| Union width capped at 30 days | 353 | 32,652 | 828 |
+| One show per batch | 1,431 | 30,658 | 1,434 |
+
+Requests already used: 47 (my 8 + the pilot's 39). The remaining shows need about 900 more as built, so about **950 in total (cap 1,100)**. A 40-day width cap would save about 80 requests (9%) and download 14% fewer rows, at the cost of more batches and a change to the batching function.
+
+### The one `no_records` show
+
+`anilist:101500`: an ONA with 11 episodes released **all at once** (start date = end date = 2018-10-18). It has no daily airing history, hence no records in w1. A binge-released show cannot give an episode-3 snapshot. Suggested rule for TASK 010: exclude when `start_date == end_date` (or M(1) = M(final)), with reason `binge_release`.
+
 ## Findings
 
 1. **The docs site blocks scripts** (HTTP 403), so enum values and argument types come from GraphQL introspection instead.
@@ -83,4 +116,7 @@ None live: no 429, no retries, no duplicates, no Atlas refusals during my tests.
 
 ## Next
 
-- Nirav runs the acceptance commands (STOP after step 3 if records are over 1.3× the estimate) and pastes the output; the real numbers are added here.
+- The instructor rules on the 1.36× stop and the three questions below (plus question 4), then the full run continues; the remaining acceptance steps (full run, second run, `check_trend_markers`, `check_db`) follow.
+
+4. **Stop rule yardstick:** the 1.3× rule compares with the own-window (lower) estimate, which the model shows is too low whenever a union window is wide. Continue as built (about 950 requests in total), or cap batches by union width (about 40 days, about 900 in total), and which yardstick should the rule use from now on?
+5. **Binge-released shows** (start date = end date) have no airing history: exclude with reason `binge_release` in TASK 010?
