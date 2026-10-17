@@ -1,0 +1,78 @@
+{
+ "_note": "One show's real airingSchedules rows, trimmed from the TASK 007 probe. The show has 13 episodes.",
+ "episodes": 13,
+ "data": {
+  "Page": {
+   "pageInfo": {
+    "hasNextPage": false
+   },
+   "airingSchedules": [
+    {
+     "mediaId": 101291,
+     "episode": 1,
+     "airingAt": 1538586900
+    },
+    {
+     "mediaId": 101291,
+     "episode": 2,
+     "airingAt": 1539191700
+    },
+    {
+     "mediaId": 101291,
+     "episode": 3,
+     "airingAt": 1539796500
+    },
+    {
+     "mediaId": 101291,
+     "episode": 4,
+     "airingAt": 1540401300
+    },
+    {
+     "mediaId": 101291,
+     "episode": 5,
+     "airingAt": 1541006100
+    },
+    {
+     "mediaId": 101291,
+     "episode": 6,
+     "airingAt": 1541610900
+    },
+    {
+     "mediaId": 101291,
+     "episode": 7,
+     "airingAt": 1542215700
+    },
+    {
+     "mediaId": 101291,
+     "episode": 8,
+     "airingAt": 1542820500
+    },
+    {
+     "mediaId": 101291,
+     "episode": 9,
+     "airingAt": 1543425300
+    },
+    {
+     "mediaId": 101291,
+     "episode": 10,
+     "airingAt": 1544030100
+    },
+    {
+     "mediaId": 101291,
+     "episode": 11,
+     "airingAt": 1544634900
+    },
+    {
+     "mediaId": 101291,
+     "episode": 12,
+     "airingAt": 1545239700
+    },
+    {
+     "mediaId": 101291,
+     "episode": 13,
+     "airingAt": 1545844500
+    }
+   ]
+  }
+ }
+}
