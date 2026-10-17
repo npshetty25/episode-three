@@ -66,3 +66,59 @@ def test_graphql_error_is_raised_without_retry(monkeypatch, waits):
 def test_offline_guard_blocks_real_network():
     with pytest.raises(RuntimeError, match="tried to use the network"):
         requests.get("https://graphql.anilist.co", timeout=5)
+
+
+# --- shared pagination stop rule ---------------------------------------------
+
+def fake_paged(rows_per_page, has_next):
+    """A fake post_query serving the given pages; returns (fake, list_of_pages_requested)."""
+    requested = []
+
+    def fake(query, variables=None):
+        requested.append(variables["page"])
+        index = variables["page"] - 1
+        return {"Page": {"pageInfo": {"hasNextPage": has_next[index]}, "items": rows_per_page[index]}}
+
+    return fake, requested
+
+
+def collect(per_page=3, **kwargs):
+    return anilist.collect_pages("query", {}, lambda data: data["Page"]["items"], per_page, **kwargs)
+
+
+def test_stops_when_has_next_page_is_false(monkeypatch):
+    fake, requested = fake_paged([[1, 2, 3], [4, 5, 6]], [True, False])
+    monkeypatch.setattr(anilist, "post_query", fake)
+    assert collect() == [1, 2, 3, 4, 5, 6] and requested == [1, 2]
+
+
+def test_stops_on_a_short_page_even_if_has_next_page_is_true(monkeypatch):
+    fake, requested = fake_paged([[1, 2], [3]], [True, True])  # page 1 has 2 rows < perPage 3
+    monkeypatch.setattr(anilist, "post_query", fake)
+    assert collect() == [1, 2] and requested == [1]
+
+
+def test_a_full_page_with_has_next_page_keeps_going(monkeypatch):
+    fake, requested = fake_paged([[1, 2, 3], [4]], [True, True])
+    monkeypatch.setattr(anilist, "post_query", fake)
+    assert collect() == [1, 2, 3, 4] and requested == [1, 2]
+
+
+def test_page_limit_and_budget_hook(monkeypatch):
+    fake, requested = fake_paged([[1, 2, 3]] * 5, [True] * 5)
+    monkeypatch.setattr(anilist, "post_query", fake)
+    with pytest.raises(anilist.AniListError, match="more than 2 pages"):
+        collect(max_pages=2)
+    assert requested == [1, 2]
+
+    calls = []
+
+    def stop_before_second_request():
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("budget")
+
+    requested.clear()
+    with pytest.raises(RuntimeError, match="budget"):
+        collect(before_request=stop_before_second_request)
+    assert requested == [1]  # the hook ran before request 2, which was never made

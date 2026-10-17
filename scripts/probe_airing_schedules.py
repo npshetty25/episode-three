@@ -34,17 +34,20 @@ FIXTURE_PATH = PROJECT_ROOT / "tests" / "fixtures" / "airing_schedules_sample.js
 
 
 def fetch_schedules(ids, requests_at_start):
-    """All schedule rows for a batch of shows (pages until hasNextPage is false)."""
-    rows, pages = [], []
-    for page in range(1, MAX_PAGES + 1):
+    """All schedule rows for a batch of shows (pages until the shared stop rule says done)."""
+    def check_budget():
         if anilist.stats["requests"] - requests_at_start >= REQUEST_CAP:
             raise candidates.RequestBudgetExceeded(f"the probe cap of {REQUEST_CAP} requests would be exceeded")
-        data = anilist.post_query(probe.AIRING_QUERY, {"ids": ids, "page": page})
+
+    pages = []
+
+    def rows_of(data):
         pages.append(data)
-        rows.extend(data["Page"]["airingSchedules"])
-        if not data["Page"]["pageInfo"]["hasNextPage"]:
-            return rows, pages
-    raise anilist.AniListError(f"more than {MAX_PAGES} pages for one batch; stopping as a safety measure")
+        return data["Page"]["airingSchedules"]
+
+    rows = anilist.collect_pages(probe.AIRING_QUERY, {"ids": ids}, rows_of, 50, max_pages=MAX_PAGES,
+                                 before_request=check_budget)
+    return rows, pages
 
 
 def save_fixture_once(shows, rows_by_show):

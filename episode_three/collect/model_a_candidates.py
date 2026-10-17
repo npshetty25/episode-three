@@ -162,17 +162,14 @@ def list_season(season, year, requests_at_start, request_cap=LISTING_REQUEST_CAP
 
 
 def _all_pages(season, year, per_page, requests_at_start, request_cap):
-    shows = []
-    for page in range(1, MAX_PAGES + 1):
+    def check_budget():
         if anilist.stats["requests"] - requests_at_start >= request_cap:
-            raise RequestBudgetExceeded(f"stopping before {season} {year} page {page}: "
+            raise RequestBudgetExceeded(f"stopping before a {season} {year} request: "
                                         f"the cap of {request_cap} requests would be exceeded")
-        data = anilist.post_query(SEASON_QUERY, {"season": season, "seasonYear": year,
-                                                 "page": page, "perPage": per_page})
-        shows.extend(data["Page"]["media"])
-        if not data["Page"]["pageInfo"]["hasNextPage"]:
-            return shows
-    raise anilist.AniListError(f"{season} {year}: more than {MAX_PAGES} pages; stopping as a safety measure")
+
+    return anilist.collect_pages(
+        SEASON_QUERY, {"season": season, "seasonYear": year, "perPage": per_page},
+        lambda data: data["Page"]["media"], per_page, max_pages=MAX_PAGES, before_request=check_budget)
 
 
 # --- Storing ----------------------------------------------------------------

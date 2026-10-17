@@ -106,8 +106,9 @@ def fake_pages(pages):
 def test_list_season_follows_pages_and_removes_repeats(monkeypatch):
     fake, calls = fake_pages([[{"id": 1}, {"id": 2}], [{"id": 2}, {"id": 3}]])  # id 2 shifted onto page 2
     monkeypatch.setattr(anilist, "post_query", fake)
-    shows, per_page = candidates.list_season("FALL", 2018, anilist.stats["requests"])
-    assert [m["id"] for m in shows] == [1, 2, 3] and per_page == 50
+    # page size 2, so both pages are "full" and the stop rule keeps going until hasNextPage is false
+    shows, per_page = candidates.list_season("FALL", 2018, anilist.stats["requests"], per_page_steps=(2,))
+    assert [m["id"] for m in shows] == [1, 2, 3] and per_page == 2
     assert [c["page"] for c in calls] == [1, 2]
     assert all(c["season"] == "FALL" and c["seasonYear"] == 2018 for c in calls)
     assert set(calls[0]) == {"season", "seasonYear", "page", "perPage"}  # no null filters

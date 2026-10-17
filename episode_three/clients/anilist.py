@@ -139,3 +139,24 @@ def _record_rate_limit_headers(response):
     if remaining is not None and remaining.isdigit():
         lowest = stats["lowest_remaining"]
         stats["lowest_remaining"] = int(remaining) if lowest is None else min(lowest, int(remaining))
+
+
+def collect_pages(query, variables, rows_of, per_page, max_pages=10, before_request=None):
+    """Fetch page 1, 2, 3... of a Page query and return all rows.
+
+    Stops when hasNextPage is false OR a page has fewer rows than `per_page`
+    (a short page is the last one, even if AniList still says hasNextPage). The page
+    size is passed in `variables` by the caller as "perPage" when the query takes it.
+    `rows_of(data)` picks the list of rows out of one answer; `before_request()` is called
+    before every request so callers can enforce a request budget (it may raise).
+    """
+    rows = []
+    for page in range(1, max_pages + 1):
+        if before_request is not None:
+            before_request()
+        data = post_query(query, {**variables, "page": page})
+        page_rows = rows_of(data)
+        rows.extend(page_rows)
+        if not data["Page"]["pageInfo"]["hasNextPage"] or len(page_rows) < per_page:
+            return rows
+    raise AniListError(f"more than {max_pages} pages; stopping as a safety measure")
