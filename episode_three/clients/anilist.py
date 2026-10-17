@@ -141,7 +141,7 @@ def _record_rate_limit_headers(response):
         stats["lowest_remaining"] = int(remaining) if lowest is None else min(lowest, int(remaining))
 
 
-def collect_pages(query, variables, rows_of, per_page, max_pages=10, before_request=None):
+def collect_pages(query, variables, rows_of, per_page, max_pages=10, before_request=None, is_complete=None):
     """Fetch page 1, 2, 3... of a Page query and return all rows.
 
     Stops when hasNextPage is false OR a page has fewer rows than `per_page`
@@ -149,6 +149,9 @@ def collect_pages(query, variables, rows_of, per_page, max_pages=10, before_requ
     size is passed in `variables` by the caller as "perPage" when the query takes it.
     `rows_of(data)` picks the list of rows out of one answer; `before_request()` is called
     before every request so callers can enforce a request budget (it may raise).
+    `is_complete(rows)` is an optional extra stop: when the rows so far already cover everything
+    the query could return (e.g. every requested show/episode pair), no further page can exist,
+    so we skip the request that AniList's hasNextPage would otherwise trigger on a full page.
     """
     rows = []
     for page in range(1, max_pages + 1):
@@ -158,5 +161,7 @@ def collect_pages(query, variables, rows_of, per_page, max_pages=10, before_requ
         page_rows = rows_of(data)
         rows.extend(page_rows)
         if not data["Page"]["pageInfo"]["hasNextPage"] or len(page_rows) < per_page:
+            return rows
+        if is_complete is not None and is_complete(rows):
             return rows
     raise AniListError(f"more than {max_pages} pages; stopping as a safety measure")

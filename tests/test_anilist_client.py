@@ -122,3 +122,11 @@ def test_page_limit_and_budget_hook(monkeypatch):
     with pytest.raises(RuntimeError, match="budget"):
         collect(before_request=stop_before_second_request)
     assert requested == [1]  # the hook ran before request 2, which was never made
+
+
+def test_is_complete_skips_the_request_a_full_page_would_trigger(monkeypatch):
+    fake, requested = fake_paged([[1, 2, 3], [4]], [True, False])  # a full page, hasNextPage true
+    monkeypatch.setattr(anilist, "post_query", fake)
+    assert collect(is_complete=lambda rows: len(rows) == 3) == [1, 2, 3] and requested == [1]
+    requested.clear()  # when the rows do not yet cover everything, it still goes on
+    assert collect(is_complete=lambda rows: len(rows) == 4) == [1, 2, 3, 4] and requested == [1, 2]

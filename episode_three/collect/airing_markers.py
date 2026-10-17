@@ -174,6 +174,16 @@ def anilist_id(doc):
     return int(doc["_id"].split(":")[1])
 
 
+def covers_every_pair(rows, ids, episodes):
+    """True when `rows` contain every (show, episode) pair that was asked for.
+
+    Each show has at most one schedule row per episode, so once every pair is present no more
+    rows can exist, and a full page of exactly ids x episodes rows needs no second request.
+    """
+    seen = {(row["mediaId"], row["episode"]) for row in rows}
+    return all((media_id, episode) in seen for media_id in ids for episode in episodes)
+
+
 def group_rows_by_show(rows):
     grouped = {}
     for row in rows:

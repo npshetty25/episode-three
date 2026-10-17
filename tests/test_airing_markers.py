@@ -238,3 +238,12 @@ def test_estimate_pages_batches_by_window_start():
     two = m.estimate_pages(spread, "w1")
     assert two["pages_upper"] > two["pages_lower"] and two["batches"] == 1
     assert m.estimate_pages([], "w1")["batches"] == 0
+
+
+def test_a_batch_that_covers_every_pair_needs_no_second_page():
+    ids, episodes = [1, 2], [1, 2, 3, 4, 12]
+    rows = [{"mediaId": i, "episode": e, "airingAt": 1} for i in ids for e in episodes]
+    assert m.covers_every_pair(rows, ids, episodes) is True
+    assert m.covers_every_pair(rows[:-1], ids, episodes) is False  # one pair missing: keep paging
+    assert m.covers_every_pair(rows + rows, ids, episodes) is True   # duplicate rows do not matter
+    assert m.covers_every_pair([], ids, episodes) is False
