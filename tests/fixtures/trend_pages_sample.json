@@ -1,0 +1,14 @@
+{
+ "_note": "HAND-MADE mediaTrends answer for tests (not real data): 2 pages of 3 rows, sorted [MEDIA_ID, DATE]. Shows 1 and 2 tie on the same dates (1538492400 = 2018-10-03 00:00 JST). The last row of page 1 reappears at the top of page 2, as a page-boundary repeat would.",
+ "pages": [
+  {"Page": {"pageInfo": {"hasNextPage": true}, "mediaTrends": [
+    {"mediaId": 1, "date": 1538492400, "episode": null, "averageScore": 0, "popularity": 1000, "inProgress": 10, "trending": 5, "releasing": true},
+    {"mediaId": 1, "date": 1538578800, "episode": 1, "averageScore": 78, "popularity": 1500, "inProgress": 300, "trending": 40, "releasing": true},
+    {"mediaId": 2, "date": 1538492400, "episode": null, "averageScore": 0, "popularity": 900, "inProgress": 8, "trending": 4, "releasing": true}
+  ]}},
+  {"Page": {"pageInfo": {"hasNextPage": false}, "mediaTrends": [
+    {"mediaId": 2, "date": 1538492400, "episode": null, "averageScore": 0, "popularity": 900, "inProgress": 8, "trending": 4, "releasing": true},
+    {"mediaId": 2, "date": 1538578800, "episode": 1, "averageScore": 70, "popularity": 1200, "inProgress": 250, "trending": 30, "releasing": true}
+  ]}}
+ ]
+}
