@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-18
 - **Task:** TASK 009 from the instructor (spec v1.7 → v1.8)
-- **Status:** **Paused at the pilot by the 1.3× stop rule** (the instructor's instruction). Pilot done and stored (50 shows); the full run, the marker comparison and the remaining checks wait for the instructor's ruling.
+- **Status:** Pilot stopped by the 1.3× rule (2026-10-18). The instructor ruled (continuation, below): 40-day union cap, model-based stop rule. **Built and tested (114 offline tests); waiting on Nirav's full w1 run** and the checks that follow it.
 
 ## Summary
 
@@ -80,6 +80,30 @@ Requests already used: 47 (my 8 + the pilot's 39). The remaining shows need abou
 
 `anilist:101500`: an ONA with 11 episodes released **all at once** (start date = end date = 2018-10-18). It has no daily airing history, hence no records in w1. A binge-released show cannot give an episode-3 snapshot. Suggested rule for TASK 010: exclude when `start_date == end_date` (or M(1) = M(final)), with reason `binge_release`.
 
+## Continuation (2026-10-19): width cap, model-based stop rule
+
+### Files changed (one commit each)
+
+| Commit | Change |
+|---|---|
+| `45d3c01` | `make_w1_batches`: new batch at 10 shows OR when the next show would widen the union past `W1_MAX_UNION_DAYS = 40`; long windows stay alone. `predict_batch_records` (airing-overlap model), `predicted_requests` (`records // 50 + 1`), `should_stop`, `is_binge`; fixture `trend_pilot_batches.json` (the 6 real batches: show windows, ep1 marker, w2 start, actual records) |
+| `45b2883` | Collector: model-based stop rule (after ≥ 10 batches stop if cumulative actual / predicted > 1.15; both totals logged to `sync_runs`), the old 1.3× rule removed, dry run prints batches / predicted records / predicted requests / union-width distribution, w2 projection |
+| `4db063e` | `check_trend_markers`: `m1_unknown` count, binge sub-label `m3_not_before_m4 (binge)` |
+| `ae34f4e` | Spec v1.8 additions (items 6–10) |
+
+### Verification (developer, 0 requests)
+
+| Check | Result |
+|---|---|
+| `python -m pytest -q` | **114 passed, 1 deselected** (was 105) |
+| Model vs the 6 real batches (test, each within 10%) | passes; the model was within 6% for each (357/227/349/549/360/322 predicted vs 336/217/339/550/350/315) |
+| `predicted_requests` vs real request counts | 336→7, 217→5, 339→7, 550→12, 350→8, 315→7: all six match (an exact multiple of 50 costs one extra empty page) |
+| `collect_score_trends --window w1 --dry-run` | **1,371 shows → 204 batches** (201 normal + 3 long alone); union width min/median/p95/max 3 / 34 / 40 / 108; **predicted 35,602 records, 818 requests**; earlier runs used 46 in `sync_runs` (47 with my introspection request), so about **864 in total** (cap 1,100) |
+| w2 projection (same model) | 171 batches (finale-date order, 10 per batch, 40-day cap), 29,173 records, **about 689 requests** |
+| `check_trend_markers` on the 59 shows collected so far | 149 comparable markers, **98.7% within ±1 day** (88% exactly equal); 11 fallback shows, 8 rescued (eps 3 and 4 present); 5 of 59 lack an ep3 snapshot (2 `no_scored_record`, 2 binge, 1 `no_m4`); `m1_unknown` 8 of 59 |
+
+No requests were made in this continuation (0 developer requests); the task total stays at the 47 already used.
+
 ## Findings
 
 1. **The docs site blocks scripts** (HTTP 403), so enum values and argument types come from GraphQL introspection instead.
@@ -116,7 +140,8 @@ None live: no 429, no retries, no duplicates, no Atlas refusals during my tests.
 
 ## Next
 
-- The instructor rules on the 1.36× stop and the three questions below (plus question 4), then the full run continues; the remaining acceptance steps (full run, second run, `check_trend_markers`, `check_db`) follow.
+- Nirav runs the full w1 collection and the remaining acceptance steps (second run, `check_trend_markers`, `check_db`, `git log`); the real totals are added here.
+- (Questions 1–5 below were answered by the instructor's ruling: width cap 40 days, model-based stop rule, binge → M(3) < M(4), m1_unknown keeps the show, w2 one contiguous window.)
 
 4. **Stop rule yardstick:** the 1.3× rule compares with the own-window (lower) estimate, which the model shows is too low whenever a union window is wide. Continue as built (about 950 requests in total), or cap batches by union width (about 40 days, about 900 in total), and which yardstick should the rule use from now on?
 5. **Binge-released shows** (start date = end date) have no airing history: exclude with reason `binge_release` in TASK 010?
