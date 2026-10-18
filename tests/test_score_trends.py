@@ -273,11 +273,12 @@ def finale_doc(number, finale_day):
 
 def test_w2_projection_batches_by_finale_date_with_no_releasing_filter():
     base = utc_day(2019, 1, 1)
-    docs = [finale_doc(n, base + n * DAY) for n in range(10)]  # finales on 10 consecutive days
+    docs = [finale_doc(n, base + n * DAY) for n in range(3)]  # finales on 3 consecutive days
     batches, records, requests_needed = trends.project_w2(docs)
     assert batches == 1
-    assert records == 10 * 21  # union = [base-1, base+9+10]: 21 days, every day has a record for every show
-    assert requests_needed == 210 // 50 + 1
+    assert records == 3 * 14  # union = [base-1, base+2+10]: 14 days (the cap), a record for every show-day
+    assert requests_needed == 42 // 50 + 1
+    assert trends.project_w2([finale_doc(n, base + n * DAY) for n in range(4)])[0] == 2  # 15 days > cap 14
     far_apart = docs + [finale_doc(99, base + 200 * DAY)]
     assert trends.project_w2(far_apart)[0] == 2  # a finale 200 days later cannot join the batch (width cap)
     assert trends.project_w2([]) == (0, 0, 0)
