@@ -29,6 +29,12 @@ def main():
     version = client.server_info()["version"]
     print(f"Ping OK (MongoDB server version {version})")
 
+    # 1b. Collections of the project database, with document counts.
+    app_db = db.get_db()
+    print(f"\nCollections in {app_db.name}:")
+    for name in sorted(app_db.list_collection_names()):
+        print(f"  {name:<22} {app_db[name].estimated_document_count():>8,} documents")
+
     # 2. Storage: data + indexes for every database, compared with the 512 MB limit.
     print("\nStorage per database (data + indexes):")
     total_mb = 0

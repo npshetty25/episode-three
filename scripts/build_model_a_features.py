@@ -22,7 +22,7 @@ from pymongo import ASCENDING, ReplaceOne, UpdateOne
 
 from episode_three import anilist_sync, config, db
 from episode_three.collect import score_trends as trends
-from episode_three.features import model_a
+from episode_three.features import model_a, model_a_report
 from episode_three.features import model_a_pipeline as pipeline
 
 
@@ -51,6 +51,17 @@ def run_pipeline(database, documents):
     return trainable
 
 
+REPORT = PROJECT_ROOT / "reports" / "model_a_data_funnel.md"
+
+
+def write_report(candidates, documents, features):
+    """The funnel report; its per-split counts must equal what the aggregation wrote to model_a_features."""
+    expected = Counter(model_a_report.split_of(d) for d in documents if d["status"] == "trainable")
+    assert expected == Counter(f["split"] for f in features), "pipeline split differs from the Python rule"
+    REPORT.write_text(model_a_report.funnel_markdown(candidates, documents), encoding="utf-8", newline="\n")
+    print(f"Wrote {REPORT.relative_to(PROJECT_ROOT)}")
+
+
 def print_summary(documents, features):
     by_split = Counter(f["split"] for f in features)
     print(f"\nEligible shows: {len(documents)}; trainable: {len(features)} "
@@ -74,6 +85,7 @@ def main():
     model_a.assert_splits_disjoint({f["_id"]: f["split"] for f in features},
                                    {f["_id"]: (f["season_year"], f["season"]) for f in features})
     print_summary(documents, features)
+    write_report(candidates, documents, features)
 
 
 if __name__ == "__main__":
