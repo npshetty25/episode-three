@@ -1,0 +1,98 @@
+{
+  "alpha": 100,
+  "alpha_selection": {
+    "chosen_at_boundary": false,
+    "cv_best_alpha": 100,
+    "grid": [
+      0.1,
+      1,
+      10,
+      100,
+      300,
+      1000,
+      3000
+    ],
+    "rule": "lowest mean time-CV MAE inside train; family and popularity variant not reopened",
+    "source": "reports/model_a_selection_v1.json (ridge_alpha_extension)"
+  },
+  "code_commit": "cd2912ab7223685d4cfec8ff667885b6e81ae0f4",
+  "criterion": "PASS if test MAE of Ridge is at least 10% below the test MAE of B1, else FAIL",
+  "family": "ridge",
+  "features": [
+    "ep3_score",
+    "ep1_score",
+    "score_delta_1_3",
+    "popularity",
+    "popularity_growth_1_3",
+    "ep3_in_progress",
+    "episodes_planned",
+    "prequel_finale_score",
+    "is_sequel",
+    "prequel_score_known",
+    "format",
+    "source_material",
+    "genres"
+  ],
+  "final_fit": {
+    "refit": "Ridge pipeline, B2 mean and B3 linear fit on train + validation; B1 needs no fit",
+    "rows": {
+      "total": 873,
+      "train": 681,
+      "validation": 192
+    }
+  },
+  "planned_metrics": {
+    "bootstrap": {
+      "level": 95,
+      "resamples": 1000,
+      "seed": 42
+    },
+    "metrics": [
+      "MAE with bootstrap 95% CI",
+      "RMSE",
+      "within +-3"
+    ],
+    "models": [
+      "B1",
+      "B2",
+      "B3",
+      "ridge"
+    ],
+    "paired": [
+      "ridge - B1",
+      "ridge - B3"
+    ]
+  },
+  "planned_report_sections": [
+    "primary",
+    "paired",
+    "criterion",
+    "sensitivity.per_season",
+    "sensitivity.by_format",
+    "sensitivity.by_sequel",
+    "sensitivity.excluding_flagged",
+    "sensitivity.secondary_label",
+    "largest_errors"
+  ],
+  "planned_sensitivity": {
+    "excluding_flagged": "each of marker_disagreement, label_offset_unusual, m1_unknown, fallback windows, and all together",
+    "format": "TV vs ONA",
+    "largest_errors": "the 10 largest Ridge errors: id, romaji title, season, ep3, prediction, label",
+    "per_test_season": "n, Ridge MAE, B1 MAE",
+    "secondary_label": "same predictions scored against the finale + 5..9 label, shows that have one, Ridge and B1",
+    "sequel": "sequel vs non-sequel"
+  },
+  "popularity_variant": "raw",
+  "preprocessing": [
+    "numeric: SimpleImputer(median, add_indicator=True) then StandardScaler (Ridge)",
+    "format, source_material: OneHotEncoder(handle_unknown=ignore)",
+    "genres: multi-hot, vocabulary from the fitting rows, unseen genres ignored",
+    "log1p for popularity and in-progress counts",
+    "all fitted on train + validation rows only"
+  ],
+  "purpose": "Pre-registration of the Model A final evaluation. Committed BEFORE any test row is loaded.",
+  "run_once": "reports/model_a_v1.json is written once; a rerun needs --rerun-reason and is stored in the report",
+  "target": "delta = finale - ep3_score; prediction = clip(ep3_score + delta, 0, 100)",
+  "test_split": "not loaded when this lock was written",
+  "trainval_data_fingerprint": "67e472c9b5669d919146efd376deb439d98322119a6b7c7b597ec929b3636f14"
+}
