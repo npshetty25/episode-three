@@ -281,3 +281,116 @@ def test_w2_projection_batches_by_finale_date_with_no_releasing_filter():
     far_apart = docs + [finale_doc(99, base + 200 * DAY)]
     assert trends.project_w2(far_apart)[0] == 2  # a finale 200 days later cannot join the batch (width cap)
     assert trends.project_w2([]) == (0, 0, 0)
+
+
+# --- w2: the cap choice, batching and the model ---------------------------------------------------------
+
+def w2_doc(number, finale_day):
+    return {"_id": f"anilist:{number}", "trend_windows": {"w2": {"from": finale_day - DAY, "to": finale_day + 10 * DAY}}}
+
+
+def test_w2_batches_sort_by_finale_and_respect_the_cap():
+    base = utc_day(2019, 1, 1)
+    docs = [w2_doc(n, base + 3 * n * DAY) for n in range(8)]  # a finale every 3 days; each window is 12 days
+    wide = trends.make_w2_batches(docs, max_union_days=40)
+    narrow = trends.make_w2_batches(docs, max_union_days=15)  # two shows 3 days apart span 15 days
+    assert [len(b) for b in wide] == [8] and [len(b) for b in narrow] == [2, 2, 2, 2]
+    for batch in narrow:
+        assert markers.window_days(trends.union_window(batch, "w2")) <= 15
+    starts = [d["trend_windows"]["w2"]["from"] for b in wide for d in b]
+    assert starts == sorted(starts)
+    assert trends.make_w2_batches(docs, size=3, max_union_days=40) != wide  # the size cap applies too
+
+
+def test_w2_prediction_is_one_record_per_show_per_day_of_the_union_window():
+    base = utc_day(2019, 1, 1)
+    batch = [w2_doc(1, base), w2_doc(2, base + 4 * DAY)]
+    assert markers.window_days(trends.union_window(batch, "w2")) == 16  # [base-1, base+14]
+    assert trends.predict_w2_batch_records(batch) == 2 * 16
+
+
+def test_the_cap_comparison_picks_the_cheapest_cap():
+    base = utc_day(2019, 1, 1)
+    docs = [w2_doc(n, base + 2 * n * DAY) for n in range(60)]
+    rows = trends.w2_cap_comparison(docs)
+    assert [r["cap"] for r in rows] == [12, 14, 20, 40]
+    chosen = trends.choose_w2_cap(rows)
+    assert min(r["requests"] for r in rows) == next(r["requests"] for r in rows if r["cap"] == chosen)
+    assert trends.choose_w2_cap([{"cap": 20, "requests": 5}, {"cap": 12, "requests": 5}]) == 12  # tie: smaller cap
+    assert trends.W2_MAX_UNION_DAYS in trends.W2_CAP_CHOICES
+
+
+def test_w2_stop_rule_checks_after_five_batches_and_the_query_has_no_releasing_filter():
+    assert trends.should_stop(1500, 1000, 4, min_batches=trends.W2_STOP_MIN_BATCHES) == (False, 1.5)
+    assert trends.should_stop(1500, 1000, 5, min_batches=trends.W2_STOP_MIN_BATCHES) == (True, 1.5)
+    assert "releasing: true" not in trends.TREND_QUERY_W2 and "sort: [MEDIA_ID, DATE]" in trends.TREND_QUERY_W2
+    assert "releasing" in trends.TREND_QUERY_W2.split("{", 3)[-1]  # the field is still returned
+
+
+def test_w2_updates_use_their_own_arrays_and_statuses():
+    snaps = [snap(utc_day(2019, 1, 2), score=80, releasing=False)]
+    doc = w2_doc(1, utc_day(2019, 1, 1)) | {"season": "WINTER", "season_year": 2019}
+    stamp = datetime(2026, 10, 20, tzinfo=UTC)
+    fields, candidate_fields = trends.build_updates(doc, snaps, stamp, window="w2")
+    assert set(fields) == {"season", "season_year", "snapshots_w2", "n_snapshots_w2", "w2_collected_at"}
+    assert fields["n_snapshots_w2"] == 1 and candidate_fields == {"w2_status": "collected", "w2_collected_at": stamp}
+    assert trends.build_updates(doc, [], stamp, window="w2")[1]["w2_status"] == "no_records"
+    assert trends.build_updates(doc, snaps, stamp, window="w2") == trends.build_updates(doc, snaps, stamp, window="w2")
+
+
+# --- labels: a transition fixture and a no-transition fixture ---------------------------------------------
+
+def w2_shows():
+    rows = load_fixture("w2_rows_sample.json")["rows"]
+    by_show, duplicates = trends.parse_trend_rows(rows)
+    assert duplicates == 0
+    return by_show[10], by_show[11]
+
+
+FINALE = utc_day(2018, 12, 20)
+
+
+def test_primary_label_is_the_last_scored_releasing_record():
+    transition, no_transition = w2_shows()
+    assert trends.find_primary_label(transition) == (82, FINALE, 12)  # after Dec 20 the records are not releasing
+    assert trends.find_primary_label(no_transition) == (70, utc_day(2018, 12, 30), None)  # still releasing: last record
+    unscored = [snap(FINALE, score=0), snap(FINALE + DAY, score=None, releasing=True)]
+    assert trends.find_primary_label(unscored) is None and trends.find_primary_label([]) is None
+    assert trends.find_primary_label([snap(FINALE, score=60, releasing=False)]) is None  # not releasing: no primary
+
+
+def test_secondary_label_is_the_scored_record_nearest_to_finale_plus_7_inside_5_to_9():
+    transition, _ = w2_shows()
+    assert trends.find_secondary_label(transition, FINALE) == (85, FINALE + 7 * DAY)
+    only_far = [snap(FINALE + 3 * DAY, score=80, releasing=False), snap(FINALE + 10 * DAY, score=81, releasing=False)]
+    assert trends.find_secondary_label(only_far, FINALE) is None  # outside 5..9
+    edge = [snap(FINALE + 5 * DAY, score=70, releasing=False), snap(FINALE + 9 * DAY, score=72, releasing=False)]
+    assert trends.find_secondary_label(edge, FINALE) == (70, FINALE + 5 * DAY)  # +5 and +9 are both 2 days from +7: the earlier wins
+    assert trends.find_secondary_label([snap(FINALE + 7 * DAY, score=0, releasing=False)], FINALE) is None
+
+
+def test_finale_flags_transition_vs_no_transition():
+    transition, no_transition = w2_shows()
+    good = trends.finale_flags(transition, 12)
+    assert good == {"no_transition": False, "finale_episode_mismatch": False, "label_at_window_edge": False}
+    flagged = trends.finale_flags(no_transition, 12)
+    assert flagged["no_transition"] is True and flagged["label_at_window_edge"] is True  # last record is the label
+    assert trends.finale_flags(transition, 13)["finale_episode_mismatch"] is True  # episode 12 recorded, 13 expected
+
+
+def test_label_at_window_edge_when_the_label_is_the_first_record():
+    snaps = [snap(FINALE, score=80, episode=12), snap(FINALE + DAY, score=81, releasing=False)]
+    assert trends.finale_flags(snaps, 12)["label_at_window_edge"] is True
+    assert trends.finale_flags([], 12) == {"no_transition": True, "finale_episode_mismatch": False,
+                                           "label_at_window_edge": False}
+
+
+# --- marker disagreement ------------------------------------------------------------------------------------
+
+def test_marker_disagreement_lists_episodes_more_than_one_day_apart():
+    base = utc_day(2018, 10, 5)
+    schedule = {"ep1": base, "ep2": base + 7 * DAY, "ep3": base + 14 * DAY, "ep4": base + 21 * DAY}
+    snaps = [snap(base + 8 * DAY, 2), snap(base + 22 * DAY, 4), snap(base + 20 * DAY, 3)]  # ep2 +1, ep3 +6, ep4 +1
+    assert trends.marker_disagreement(snaps, schedule) == [3]
+    assert trends.marker_disagreement([], schedule) == []
+    assert trends.marker_disagreement(snaps, {"ep1": None, "ep2": None, "ep3": None, "ep4": None}) == []

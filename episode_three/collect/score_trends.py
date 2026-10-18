@@ -25,7 +25,12 @@ W1_BATCH_SIZE = 10
 W1_MAX_UNION_DAYS = 40         # a batch's union window may not be wider than this; a longer w1 stands alone
 TASK_REQUEST_CAP = 1100        # for the whole task, pilot included
 STOP_RATIO_LIMIT = 1.15        # stop if actual / predicted records exceed this ...
-STOP_MIN_BATCHES = 10          # ... once at least this many batches are done
+STOP_MIN_BATCHES = 10          # ... once at least this many batches are done (w1)
+W2_STOP_MIN_BATCHES = 5        # w2: the model is not yet validated on real batches, so check earlier
+W2_CAP_CHOICES = (12, 14, 20, 40)  # union widths compared offline; the cheapest one is W2_MAX_UNION_DAYS
+W2_MAX_UNION_DAYS = 40         # chosen from W2_CAP_CHOICES by predicted requests (see the dry run)
+W2_TASK_REQUEST_CAP = 800      # for the w2 task, including the 1-request probe
+W2_PROBE_RESERVE = 1
 MAX_PAGES = 30
 DAY = timedelta(days=1)
 
@@ -36,6 +41,19 @@ query ($ids: [Int], $from: Int, $to: Int, $page: Int) {
     pageInfo { hasNextPage }
     mediaTrends(mediaId_in: $ids, date_greater: $from, date_lesser: $to, releasing: true,
                 sort: [MEDIA_ID, DATE]) {
+      mediaId date episode averageScore popularity inProgress trending releasing
+    }
+  }
+}"""
+
+
+# w2 = the finale window: WITHOUT the releasing filter, because the label needs the records after
+# the finale (releasing: false) as well as the last releasing one.
+TREND_QUERY_W2 = """
+query ($ids: [Int], $from: Int, $to: Int, $page: Int) {
+  Page(page: $page, perPage: 50) {
+    pageInfo { hasNextPage }
+    mediaTrends(mediaId_in: $ids, date_greater: $from, date_lesser: $to, sort: [MEDIA_ID, DATE]) {
       mediaId date episode averageScore popularity inProgress trending releasing
     }
   }
@@ -119,15 +137,15 @@ def predicted_requests(records):
     return records // 50 + 1
 
 
-def should_stop(actual_total, predicted_total, batches_done):
-    """Stop rule: after STOP_MIN_BATCHES batches, stop if actual / predicted exceeds STOP_RATIO_LIMIT.
+def should_stop(actual_total, predicted_total, batches_done, min_batches=STOP_MIN_BATCHES):
+    """Stop rule: after `min_batches` batches, stop if actual / predicted exceeds STOP_RATIO_LIMIT.
 
     Returns (stop, ratio); ratio is None while there is nothing to compare.
     """
     if predicted_total <= 0:
         return False, None
     ratio = actual_total / predicted_total
-    return batches_done >= STOP_MIN_BATCHES and ratio > STOP_RATIO_LIMIT, ratio
+    return batches_done >= min_batches and ratio > STOP_RATIO_LIMIT, ratio
 
 
 def is_binge(doc):
@@ -139,8 +157,10 @@ def is_binge(doc):
     return schedule["ep1"] is not None and schedule["ep1"] == schedule["final"]
 
 
-def make_w2_batches(candidates, size=W1_BATCH_SIZE, max_union_days=W1_MAX_UNION_DAYS):
-    """Projection only (w2 is collected in a later task): batches by finale date, same size and width cap."""
+def make_w2_batches(candidates, size=W1_BATCH_SIZE, max_union_days=None):
+    """Batches for the finale window: sorted by finale day (the w2 start), at most `size` shows each,
+    and a union window no wider than `max_union_days` (default W2_MAX_UNION_DAYS)."""
+    max_union_days = W2_MAX_UNION_DAYS if max_union_days is None else max_union_days
     ordered = sorted(candidates, key=lambda d: (d["trend_windows"]["w2"]["from"], d["_id"]))
     batches, current = [], []
     for doc in ordered:
@@ -155,14 +175,31 @@ def make_w2_batches(candidates, size=W1_BATCH_SIZE, max_union_days=W1_MAX_UNION_
     return batches
 
 
-def project_w2(candidates):
-    """Projected w2 cost: (batches, records, requests).
+def predict_w2_batch_records(batch):
+    """w2 has no releasing filter, so AniList returns one record per show per day of the union window."""
+    return len(batch) * markers.window_days(union_window(batch, "w2"))
 
-    w2 has no releasing filter, so AniList returns a record for EVERY show-day of the union window
-    (before the finale the records are releasing, after it they are not): records = shows x union days.
-    """
+
+def w2_cap_comparison(candidates, caps=W2_CAP_CHOICES):
+    """For each union-width cap: batches, predicted records and predicted requests (a list of dicts)."""
+    rows = []
+    for cap in caps:
+        batches = make_w2_batches(candidates, max_union_days=cap)
+        records = [predict_w2_batch_records(b) for b in batches]
+        rows.append({"cap": cap, "batches": len(batches), "records": sum(records),
+                     "requests": sum(predicted_requests(r) for r in records)})
+    return rows
+
+
+def choose_w2_cap(comparison):
+    """The cap with the fewest predicted requests (the smaller cap wins a tie)."""
+    return min(comparison, key=lambda row: (row["requests"], row["cap"]))["cap"]
+
+
+def project_w2(candidates):
+    """Projected w2 cost: (batches, records, requests) with the chosen cap."""
     batches = make_w2_batches(candidates)
-    records = [len(b) * markers.window_days(union_window(b, "w2")) for b in batches]
+    records = [predict_w2_batch_records(b) for b in batches]
     return len(batches), sum(records), sum(predicted_requests(r) for r in records)
 
 
@@ -172,10 +209,10 @@ def to_unix(moment):
     return int(moment.timestamp())
 
 
-def fetch_trends(ids, window, before_request=None):
+def fetch_trends(ids, window, before_request=None, query=TREND_QUERY):
     """All trend rows for a batch inside its union window, using the shared pagination helper."""
     return anilist.collect_pages(
-        TREND_QUERY, {"ids": ids, "from": to_unix(window["from"]), "to": to_unix(window["to"])},
+        query, {"ids": ids, "from": to_unix(window["from"]), "to": to_unix(window["to"])},
         lambda data: data["Page"]["mediaTrends"], 50, max_pages=MAX_PAGES, before_request=before_request)
 
 
@@ -215,14 +252,15 @@ def trim_to_window(snapshots, window):
     return [s for s in snapshots if window["from"] <= s["date"] <= window["to"]]
 
 
-def build_updates(doc, snapshots, collected_at):
-    """What to write for one show: the score_trends fields and the candidate's w1 status."""
-    trimmed = trim_to_window(snapshots, doc["trend_windows"]["w1"])
+def build_updates(doc, snapshots, collected_at, window="w1"):
+    """What to write for one show and window: the score_trends fields and the candidate's status."""
+    trimmed = trim_to_window(snapshots, doc["trend_windows"][window])
     trend_fields = {
         "season": doc.get("season"), "season_year": doc.get("season_year"),
-        "snapshots_w1": trimmed, "n_snapshots_w1": len(trimmed), "w1_collected_at": collected_at,
+        f"snapshots_{window}": trimmed, f"n_snapshots_{window}": len(trimmed), f"{window}_collected_at": collected_at,
     }
-    candidate_fields = {"w1_status": "collected" if trimmed else "no_records", "w1_collected_at": collected_at}
+    candidate_fields = {f"{window}_status": "collected" if trimmed else "no_records",
+                        f"{window}_collected_at": collected_at}
     return trend_fields, candidate_fields
 
 
@@ -264,3 +302,60 @@ def ep3_snapshot_check(snapshots, m3, m4):
     scored = [s for s in snapshots if s["releasing"] and (s["average_score"] or 0) > 0
               and m4 - 3 * DAY <= s["date"] <= m4 - DAY]
     return (True, "ok") if scored else (False, "no_scored_record")
+
+
+# --- Labels (w2 data is LABEL data: feature code must never read it) -----------------------------------
+
+def _scored(snapshot):
+    return (snapshot["average_score"] or 0) > 0
+
+
+def find_primary_label(snapshots_w2):
+    """The primary label: the last record with releasing = true and a score.
+
+    Returns (score, date, episode) or None. This is the score on the finale's airing day.
+    """
+    releasing = [s for s in sorted(snapshots_w2, key=lambda s: s["date"]) if s["releasing"] and _scored(s)]
+    if not releasing:
+        return None
+    last = releasing[-1]
+    return last["average_score"], last["date"], last["episode"]
+
+
+def find_secondary_label(snapshots_w2, finale_day):
+    """The secondary (sensitivity) label: the scored record nearest to finale + 7 days, within finale + 5..9.
+
+    Returns (score, date) or None. Ties go to the earlier day.
+    """
+    target = finale_day + 7 * DAY
+    inside = [s for s in snapshots_w2 if _scored(s) and finale_day + 5 * DAY <= s["date"] <= finale_day + 9 * DAY]
+    if not inside:
+        return None
+    best = min(inside, key=lambda s: (abs((s["date"] - target).days), s["date"]))
+    return best["average_score"], best["date"]
+
+
+def finale_flags(snapshots_w2, episodes):
+    """Checks that the finale is where we think it is.
+
+    - no_transition: no day where the records switch from releasing to not releasing inside the window.
+    - finale_episode_mismatch: the last releasing record that carries an episode number has a number
+      different from `episodes` (records without an episode number cannot be checked, so they are not flagged).
+    - label_at_window_edge: the primary label's record is the first or the last record of the window,
+      so the transition cannot be confirmed on both sides.
+    """
+    ordered = sorted(snapshots_w2, key=lambda s: s["date"])
+    transition = any(a["releasing"] and not b["releasing"] for a, b in zip(ordered, ordered[1:]))
+    with_episode = [s for s in ordered if s["releasing"] and s["episode"] is not None]
+    mismatch = bool(with_episode) and with_episode[-1]["episode"] != episodes
+    primary = find_primary_label(ordered)
+    at_edge = primary is not None and primary[1] in (ordered[0]["date"], ordered[-1]["date"])
+    return {"no_transition": not transition, "finale_episode_mismatch": mismatch, "label_at_window_edge": at_edge}
+
+
+def marker_disagreement(snapshots_w1, schedule):
+    """Episodes (1-4) whose trend marker and schedule marker differ by more than one day."""
+    trend = trend_marker_days(snapshots_w1)
+    return [n for n in (1, 2, 3, 4)
+            if trend[n] is not None and schedule[f"ep{n}"] is not None
+            and abs(day_difference(trend[n], schedule[f"ep{n}"])) > 1]

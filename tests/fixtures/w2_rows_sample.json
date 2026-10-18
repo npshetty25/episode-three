@@ -1,0 +1,245 @@
+{
+ "_note": "HAND-MADE w2 rows for tests (not real data). Show 10 has a releasing -> not releasing transition after its finale on 2018-12-20; show 11 never switches (no transition). 12 days each, 2018-12-19 .. 2018-12-30 (00:00 JST).",
+ "rows": [
+  {
+   "mediaId": 10,
+   "date": 1545145200,
+   "episode": null,
+   "averageScore": 80,
+   "popularity": 5019,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": true
+  },
+  {
+   "mediaId": 10,
+   "date": 1545231600,
+   "episode": 12,
+   "averageScore": 82,
+   "popularity": 5020,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": true
+  },
+  {
+   "mediaId": 10,
+   "date": 1545318000,
+   "episode": null,
+   "averageScore": 83,
+   "popularity": 5021,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545404400,
+   "episode": null,
+   "averageScore": 83,
+   "popularity": 5022,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545490800,
+   "episode": null,
+   "averageScore": 84,
+   "popularity": 5023,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545577200,
+   "episode": null,
+   "averageScore": 84,
+   "popularity": 5024,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545663600,
+   "episode": null,
+   "averageScore": 84,
+   "popularity": 5025,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545750000,
+   "episode": null,
+   "averageScore": 84,
+   "popularity": 5026,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545836400,
+   "episode": null,
+   "averageScore": 85,
+   "popularity": 5027,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1545922800,
+   "episode": null,
+   "averageScore": 85,
+   "popularity": 5028,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1546009200,
+   "episode": null,
+   "averageScore": 85,
+   "popularity": 5029,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 10,
+   "date": 1546095600,
+   "episode": null,
+   "averageScore": 85,
+   "popularity": 5030,
+   "inProgress": 100,
+   "trending": 5,
+   "releasing": false
+  },
+  {
+   "mediaId": 11,
+   "date": 1545145200,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545231600,
+   "episode": 12,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545318000,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545404400,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545490800,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545577200,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545663600,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545750000,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545836400,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1545922800,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1546009200,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  },
+  {
+   "mediaId": 11,
+   "date": 1546095600,
+   "episode": null,
+   "averageScore": 70,
+   "popularity": 3000,
+   "inProgress": 50,
+   "trending": 2,
+   "releasing": true
+  }
+ ]
+}
