@@ -1037,6 +1037,145 @@
     "vs_prev": "ep3_popularity_vs_prev_season (ratio to the previous season's median)"
   },
   "rf_trees": 500,
+  "ridge_alpha_extension": {
+    "alphas": [
+      0.1,
+      1,
+      10,
+      100,
+      300,
+      1000,
+      3000
+    ],
+    "chosen_alpha": 100,
+    "chosen_at_boundary": false,
+    "chosen_cv_mae": 1.696,
+    "code_commit": "11cfe4a79f3112a88032c4fc7e5691801efdb238",
+    "cv": [
+      {
+        "alpha": 0.1,
+        "mean_cv_mae": 1.8881,
+        "per_fold": [
+          2.3627,
+          2.0019,
+          1.7476,
+          1.4404
+        ]
+      },
+      {
+        "alpha": 1,
+        "mean_cv_mae": 1.843,
+        "per_fold": [
+          2.2175,
+          1.981,
+          1.7352,
+          1.4382
+        ]
+      },
+      {
+        "alpha": 10,
+        "mean_cv_mae": 1.7637,
+        "per_fold": [
+          1.9931,
+          1.954,
+          1.6824,
+          1.4253
+        ]
+      },
+      {
+        "alpha": 100,
+        "mean_cv_mae": 1.696,
+        "per_fold": [
+          1.8403,
+          1.9365,
+          1.5919,
+          1.4155
+        ]
+      },
+      {
+        "alpha": 300,
+        "mean_cv_mae": 1.7423,
+        "per_fold": [
+          1.9321,
+          2.0044,
+          1.5848,
+          1.448
+        ]
+      },
+      {
+        "alpha": 1000,
+        "mean_cv_mae": 1.8476,
+        "per_fold": [
+          2.0616,
+          2.1355,
+          1.6375,
+          1.5556
+        ]
+      },
+      {
+        "alpha": 3000,
+        "mean_cv_mae": 1.931,
+        "per_fold": [
+          2.1208,
+          2.2136,
+          1.715,
+          1.6747
+        ]
+      }
+    ],
+    "popularity_variant": "raw",
+    "test_split": "not loaded",
+    "validation_at_alpha_100": {
+      "diff_vs_b1": {
+        "better": true,
+        "ci95": [
+          -0.3779,
+          -0.0628
+        ],
+        "mean": -0.2166
+      },
+      "diff_vs_b3": {
+        "better": true,
+        "ci95": [
+          -0.4043,
+          -0.1099
+        ],
+        "mean": -0.2506
+      },
+      "mae": 1.7313,
+      "mae_ci95": [
+        1.5135,
+        1.9564
+      ],
+      "rmse": 2.3435,
+      "within_3": 84.375
+    },
+    "validation_at_chosen_alpha": {
+      "diff_vs_b1": {
+        "better": true,
+        "ci95": [
+          -0.3779,
+          -0.0628
+        ],
+        "mean": -0.2166
+      },
+      "diff_vs_b3": {
+        "better": true,
+        "ci95": [
+          -0.4043,
+          -0.1099
+        ],
+        "mean": -0.2506
+      },
+      "mae": 1.7313,
+      "mae_ci95": [
+        1.5135,
+        1.9564
+      ],
+      "rmse": 2.3435,
+      "within_3": 84.375
+    }
+  },
   "rows": {
     "train": 681,
     "validation": 192
