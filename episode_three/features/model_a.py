@@ -265,6 +265,7 @@ def build_all(candidates, w1_by_id, w2_by_id):
     documents = []
     for c in sorted(eligible, key=lambda c: c["_id"]):
         show_id, result, label = c["_id"], results[c["_id"]], labels.get(c["_id"])
+        secondary = trends.find_secondary_label(w2_by_id.get(show_id, []), finale_day[show_id]) if show_id in finale_day else None
         ep3 = result["ep3"]
         popularity = ep3["popularity"] if ep3 else None
         previous = previous_season(c["season_year"], c["season"])
@@ -283,7 +284,8 @@ def build_all(candidates, w1_by_id, w2_by_id):
             "markers": {f"m{n}": result["markers"][n] for n in (1, 2, 3, 4)},
             "ep1": result["ep1"], "ep3": ep3, "ep1_reason": result["ep1_reason"], "ep3_reason": result["ep3_reason"],
             "floor": result["floor"], "features": features, "finale_day": finale_day.get(show_id),
-            "label": label, "prequel_dropped_by_date": prequel["prequel_dropped_by_date"],
+            "label": label, "secondary_score": (secondary[0] if secondary else None),
+            "prequel_dropped_by_date": prequel["prequel_dropped_by_date"],
             "flags": {**result["flags"], "binge": trends.is_binge(c),
                       "label_offset_unusual": bool(label and label["offset_unusual"]),
                       "fallback_w1": c.get("marker_source", {}).get("w1") != "schedule",
