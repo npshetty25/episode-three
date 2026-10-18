@@ -1,8 +1,17 @@
-# Episode Three: Project Spec v1.8 (2026-10-19)
+# Episode Three: Project Spec v1.9 (2026-10-19)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.9 (2026-10-19)**, TASK 010 (trend collection, window 2 = the label window):
+1. **w2 union-width cap = 14 days.** `make_w2_batches` sorts by finale day, at most 10 shows per batch, and starts a new batch when the union window would exceed `W2_MAX_UNION_DAYS`. The cap was chosen by a cost model, not by feel: with no releasing filter, w2 returns one record per show-day of the union window, so cost = records // 50 + 1 per batch. Predicted for the 1,377 shows with w1 data: cap 12 = 666 requests, **cap 14 = 548**, cap 20 = 568, cap 40 = 638. A w2 window is 12 days on its own, so 14 lets only near-identical finales share a batch. Cap 14: 323 batches, 18,658 records (§6).
+2. **Labels are data, not features.** Primary label = the last scored record with `releasing: true`. Secondary label = the scored record nearest to finale + 7 days within +5..+9. Both are computed only from `snapshots_w2`; feature code must never read it (TASK 011 asserts this). Flags (diagnostics, nothing is excluded here): `no_transition`, `finale_episode_mismatch`, `label_at_window_edge` (§7).
+3. **Shows without w1 get `w2_status: skipped_no_w1`** (54 shows) and cost no request: no features means a useless label (§6).
+4. **ONA is not excluded as a class.** The 52 ONA shows stay; they are judged by the per-show rules (binge, ep3 snapshot), not by format (§7).
+5. **`marker_disagreement` flag** (`markers.flags.marker_disagreement`, `markers.disagreement_episodes`): true when a trend marker and the schedule marker for episode 1-4 differ by more than one day. 16 of 1,377 shows (1.2%): ep1 1, ep2 6, ep3 7, ep4 9. Nothing is excluded; Model A is trained with and without them as a sensitivity (§7).
+6. **ep3-window rule: TBD.** The rule is "diagnose first; at most ONE variant, named by the instructor before any training". The variant is not named yet, so it is not implemented (§7, §16).
+7. **Request budget.** w2 cap 800 for the task, minus 1 reserved for `probe_trends_single`; the cap counts earlier runs from `sync_runs` (job `score_trends_w2`). Model A total so far: TASK 007 = 77, TASK 008 = 155, TASK 009 = 839, TASK 010 = 1 (developer test batch) + Nirav's run (about 548 predicted).
 
 **v1.8 (2026-10-18)**, TASK 009 (trend collection, window 1):
 1. **Per-window statuses and "trainable".** Each window has its own status on `model_a_candidates`: `w1_status` and `w2_status`, each `collected` or `no_records`. The two windows live in separate arrays in `score_trends` (`snapshots_w1`, `snapshots_w2`), so each can be re-collected on its own. A show is **trainable** when both windows are collected and it has an episode-3 snapshot and a label; that field is computed in TASK 010, not here (§5, §7).
