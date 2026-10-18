@@ -110,8 +110,11 @@ def test_primary_label_and_offset():
     label = ma.primary_label(snaps, finale)
     assert (label["score"], label["offset_days"], label["offset_unusual"]) == (80, 0, False)
     late = [snap(finale, 80), snap(finale + DAY, 81)]
-    assert ma.primary_label(late, finale)["offset_days"] == 1 and ma.primary_label(late, finale)["offset_unusual"]
+    assert ma.primary_label(late, finale)["offset_days"] == 1 and not ma.primary_label(late, finale)["offset_unusual"]
     early = [snap(finale - DAY, 79)]
-    assert ma.primary_label(early, finale)["offset_days"] == -1
+    assert ma.primary_label(early, finale)["offset_days"] == -1 and not ma.primary_label(early, finale)["offset_unusual"]
+    for offset in (-2, 2, 9):   # more than one day either side is unusual
+        far = ma.primary_label([snap(finale + offset * DAY, 79)], finale)
+        assert far["offset_days"] == offset and far["offset_unusual"] is True
     assert ma.primary_label([snap(finale, 0)], finale) is None
     assert ma.primary_label([], finale) is None

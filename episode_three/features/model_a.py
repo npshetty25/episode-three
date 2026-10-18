@@ -176,8 +176,11 @@ def prequel_features(relations, finale_by_id, ep3_date):
 # --- LABELS: window-2 data. Never import these into feature code. ------------------------------------------
 
 def label_offset_unusual(offset_days):
-    """Usual = the last releasing record is the finale day itself (offset 0). Anything else is flagged."""
-    return offset_days != 0
+    """Usual = the last releasing record is the finale day or one day either side (offset -1, 0, +1).
+
+    Instructor ruling (TASK 012): AniList stamps a day late or early often enough that +-1 is normal.
+    """
+    return offset_days not in (-1, 0, 1)
 
 
 def primary_label(snapshots_w2, finale_day):
