@@ -10,6 +10,7 @@ import numpy as np
 from episode_three.models import baselines_a, metrics
 
 ROUND = 4
+BASELINE_LIBRARIES = ("numpy", "pandas", "scikit-learn", "scipy")   # what the v1 baseline report records
 FLAGS = ("marker_disagreement", "label_offset_unusual", "m1_unknown")
 
 

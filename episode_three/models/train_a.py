@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from episode_three.models import features_a
 
 SEED = 42
+RF_TREES = 500
 FAMILIES = ("ridge", "rf", "hgb")
 FOLD_TEST_YEARS = (2020, 2021, 2022, 2023)      # fit on every season_year before the scored year
 GRIDS = {                                       # pre-declared (ruling d); parameter names are Pipeline names
@@ -32,7 +33,7 @@ def make_estimator(family):
     if family == "ridge":
         return Ridge()
     if family == "rf":
-        return RandomForestRegressor(n_estimators=500, random_state=SEED, n_jobs=1)
+        return RandomForestRegressor(n_estimators=RF_TREES, random_state=SEED, n_jobs=1)
     if family == "hgb":
         return HistGradientBoostingRegressor(l2_regularization=1.0, early_stopping=False, random_state=SEED)
     raise ValueError(f"unknown family {family!r}; choose from {FAMILIES}")

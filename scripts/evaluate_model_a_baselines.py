@@ -7,9 +7,7 @@ Prints the table (B1 finale = ep3 score, B2 train mean, B3 linear regression), B
 and B1's validation breakdowns, and writes reports/model_a_baselines_v1.json. The file has no timestamps: same
 code + same data gives an identical file (git history says when it was made).
 """
-import subprocess
 import sys
-from importlib.metadata import version
 from pathlib import Path
 
 # Lets "python scripts\evaluate_model_a_baselines.py" find the episode_three package.
@@ -18,27 +16,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from episode_three import anilist_sync, config, db
-from episode_three.models import data_a, report_a
+from episode_three.models import data_a, report_a, run_info
 
 REPORT = PROJECT_ROOT / "reports" / "model_a_baselines_v1.json"
-CODE_PATHS = ("episode_three", "scripts", "requirements.txt")
-LIBRARIES = ("numpy", "pandas", "scikit-learn", "scipy")
-
-
-def code_commit():
-    """The last commit that changed code (not reports, docs or devlogs), plus -dirty if code has uncommitted edits.
-
-    Not plain HEAD: committing the report itself would move HEAD, and re-running would then change the file.
-    """
-    def git(*args):
-        return subprocess.run(["git", *args], cwd=PROJECT_ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    commit = git("log", "-1", "--format=%H", "--", *CODE_PATHS)
-    dirty = git("status", "--porcelain", "--", *CODE_PATHS)
-    return commit + ("-dirty" if dirty else "")
-
-
-def versions():
-    return {"python": ".".join(map(str, sys.version_info[:3])), **{name: version(name) for name in LIBRARIES}}
 
 
 def print_breakdown(report):
@@ -64,8 +44,8 @@ def main():
     documents = data_a.load_documents(("train", "validation"), database=database)   # the test split is never requested
     frames = data_a.to_frames(documents)
     report = report_a.build_report(
-        frames["train"], frames["validation"], code_commit(), data_a.data_fingerprint(documents),
-        ("train", "validation"), versions())
+        frames["train"], frames["validation"], run_info.code_commit(), data_a.data_fingerprint(documents),
+        ("train", "validation"), run_info.versions(report_a.BASELINE_LIBRARIES))
     print(f"\nTrain {report['rows']['train']} shows, validation {report['rows']['validation']} shows. "
           "Test split not loaded.\n")
     print("\n".join(report_a.table_lines(report)))
