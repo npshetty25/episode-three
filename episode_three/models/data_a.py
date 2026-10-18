@@ -1,8 +1,8 @@
 """Load the Model A feature table as pandas DataFrames, one per split.
 
-The test split is locked: asking for it without allow_test=True raises TestSplitLocked BEFORE the database is
-touched, and the query only ever names the requested splits. TASK 014 (the one final evaluation) passes
-allow_test=True; nothing before it should.
+The test split is locked: asking for it without the allow_test flag raises TestSplitLocked BEFORE the database is
+touched, and the query only ever names the requested splits. TASK 014 (the one final evaluation script) is the only
+caller that sets the allow_test flag; nothing else may.
 """
 import hashlib
 import json
@@ -17,7 +17,7 @@ DEFAULT_SPLITS = ("train", "validation")
 
 
 class TestSplitLocked(Exception):
-    """Raised when the test split is requested without allow_test=True."""
+    """Raised when the test split is requested without the allow_test flag."""
     __test__ = False   # not a pytest test class
 
 
@@ -28,7 +28,7 @@ def load_documents(splits=DEFAULT_SPLITS, allow_test=False, database=None):
     if unknown:
         raise ValueError(f"unknown split(s): {sorted(unknown)}")
     if "test" in splits and not allow_test:
-        raise TestSplitLocked("The test split is locked until the final evaluation (TASK 014): pass allow_test=True there only.")
+        raise TestSplitLocked("The test split is locked until the final evaluation (TASK 014): only that script may set the allow_test flag.")
     database = database if database is not None else db.get_client()[config.MONGODB_DB]
     return list(database[FEATURES].find({"split": {"$in": list(splits)}}).sort("_id", 1))
 
@@ -39,7 +39,8 @@ def to_frames(documents):
     for doc in documents:
         row = {"_id": doc["_id"], "split": doc["split"], "season": doc["season"], "season_year": doc["season_year"],
                **doc["features"], "y": doc["label"]["score"], "y_secondary": doc["label"].get("secondary_score"),
-               "label_offset_days": doc["label"]["offset_days"], **doc["flags"]}
+               "label_offset_days": doc["label"]["offset_days"], "title_romaji": (doc.get("title") or {}).get("romaji"),
+               **doc["flags"]}
         rows.append(row)
     frame = pd.DataFrame(rows)
     frames = {split: part.reset_index(drop=True) for split, part in frame.groupby("split", sort=False)} if rows else {}
