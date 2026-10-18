@@ -1,8 +1,18 @@
-# Episode Three: Project Spec v1.12 (2026-10-19)
+# Episode Three: Project Spec v1.13 (2026-10-19)
 
 > Written by the instructor; saved here verbatim by TASK 002. Changes to the plan go into a new spec version with a changelog entry, not silent edits.
 
 ## Changelog
+
+**v1.13 (2026-10-19)**, TASK 014 (Model A final evaluation on the locked test set; 0 AniList requests; Phase 6 closed):
+1. **Ruling a: alpha boundary extension before the lock.** Ridge-only time CV over alpha {0.1, 1, 10, 100, 300, 1000, 3000}, popularity raw. CV MAE: 1.888, 1.843, 1.764, **1.696**, 1.742, 1.848, 1.931. The CV-best alpha is **100, an interior optimum** (the earlier "edge of the grid" worry is resolved). Validation re-reported unchanged: MAE 1.73 [1.51, 1.96], paired vs B1 -0.217 [-0.378, -0.063]. Family and popularity variant were not reopened (§7).
+2. **Ruling b: pre-registration lock.** `reports/model_a_test_lock.json` (final config, features, preprocessing, planned metrics and sensitivity analyses, code commit, train + validation fingerprint `67e472c9b566...`) was committed (`c3067c0`) before the evaluation script existed in git and before any test row was loaded. The evaluation refuses to run unless the lock exists and is committed with no changes, and reads alpha, variant and feature list from it. The lock script never overwrites an existing lock (§7, §13).
+3. **Ruling c: final fit** of the Ridge pipeline, B2 and B3 on train + validation (873 shows; genre vocabulary and imputation medians from those rows). B1 needs no fit (§7).
+4. **Ruling d: primary result on the 337 test shows (Winter 2025 to Summer 2026).** MAE [95% CI]: B1 1.69 [1.53, 1.85], B2 7.11 [6.59, 7.62], B3 1.70 [1.54, 1.85], **Ridge 1.52 [1.38, 1.66]**. RMSE: 2.27 / 8.59 / 2.25 / 2.01. Within +-3: 89.3% / 24.9% / 84.3% / 88.4%. Paired (Ridge - baseline): vs B1 -0.169 [-0.273, -0.059], vs B3 -0.179 [-0.275, -0.071]. **Criterion (test MAE at least 10% below B1): PASS, but narrowly: 10.01% lower (1.5194 vs 1.6884)**. Ridge's share within +-3 (88.4%) is slightly below B1's (89.3%); its gain comes from fewer large misses (RMSE 2.01 vs 2.27) (§7).
+5. **Ruling e: sensitivity (descriptive, nothing tuned).** Ridge beats or ties B1 in all 7 test seasons (largest gap Summer 2026: 1.41 vs 1.83; smallest Winter 2026: 1.48 vs 1.50), for TV (1.50 vs 1.67) and ONA (1.71 vs 1.82), for sequels (1.52 vs 1.79) and non-sequels (1.52 vs 1.65). Excluding flagged shows (marker_disagreement 1, label_offset_unusual 1, m1_unknown 4, fallback windows 6, all together 8): Ridge 1.50-1.52, B1 1.67-1.69, unchanged. Against the secondary label (324 shows have one): Ridge 2.66, B1 2.82. Ridge never loses to B1 on any breakdown (§7).
+6. **Ruling f: run-once guard.** `reports/model_a_v1.json` is written once; a second run stops with "already evaluated" unless `--rerun-reason` is given, which is stored with a run count. Test split loaded: **1 time** (run_count 1, no rerun reasons). Only `scripts/evaluate_model_a_final.py` sets the allow_test flag (a test greps for it) (§7).
+7. **Ruling g: fingerprints.** The report stores the train + validation fingerprint (matches the lock) and the test fingerprint `18c8433b7da9...`, the lock file hash `cfa2cd9a843c...` and the code commit `e4f255dfb6` (§13).
+8. **Deliverables.** `reports/model_a_v1.json`, `reports/model_a_v1.md` (with the README results row) and `artifacts/models/model_a_v1.joblib` (git-ignored). The report records no timestamps (§13).
 
 **v1.12 (2026-10-19)**, TASK 013 (Model A candidates chosen on validation; 0 AniList requests, test split not loaded):
 1. **Ruling a: the target is the change.** `delta = finale score - ep3_score`; prediction = `clip(ep3_score + predicted delta, 0, 100)`. All metrics are computed on the finale score as before (§7).
