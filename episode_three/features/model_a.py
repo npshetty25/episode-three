@@ -192,3 +192,101 @@ def primary_label(snapshots_w2, finale_day):
     offset = round((date - finale_day).total_seconds() / 86_400)
     return {"score": score, "date": date, "episode": episode, "offset_days": offset,
             "offset_unusual": label_offset_unusual(offset)}
+
+
+# --- The ledger and the per-show build ---------------------------------------------------------------------
+
+def assign_split(season_year):
+    """train <= 2023, validation 2024, test 2025 through Summer 2026. (The aggregation pipeline mirrors this.)"""
+    if season_year <= TRAIN_LAST_YEAR:
+        return "train"
+    return "validation" if season_year == VALIDATION_YEAR else "test"
+
+
+def assert_splits_disjoint(split_by_id, season_by_id):
+    """Every show is in exactly one split and the splits do not overlap in time (train < validation < test)."""
+    spans = {}
+    for show_id, split in split_by_id.items():
+        low, high = spans.get(split, (None, None))
+        key = season_key(*season_by_id[show_id])
+        spans[split] = (key if low is None else min(low, key), key if high is None else max(high, key))
+    ordered = [spans[s] for s in ("train", "validation", "test") if s in spans]
+    for (_, earlier_high), (later_low, _) in zip(ordered, ordered[1:]):
+        assert earlier_high < later_low, "splits overlap in time"
+
+
+def ledger(w1_status, result, binge, label):
+    """(reasons, subreasons) for one show; no reasons = trainable.
+
+    Reasons, in funnel order: no_w1_records, no_ep1_4_trends, m3_not_before_m4 (+ binge / same_day / inverted),
+    no_ep3_snapshot (+ empty_window / lost_to_floor / no_scored_record), ep3_popularity_low, no_primary_label.
+    The first reason is the funnel step; the others are listed because they are also true.
+    """
+    reasons, sub = [], {}
+    day = {n: result["markers"][n]["day"] for n in (3, 4)}
+    if w1_status != "collected":
+        reasons.append("no_w1_records")
+    elif day[3] is None or day[4] is None:
+        reasons.append("no_ep1_4_trends")
+        sub["no_ep1_4_trends"] = "no_m3_m4" if day[3] is None and day[4] is None else ("no_m3" if day[3] is None else "no_m4")
+    elif not day[3] < day[4]:
+        reasons.append("m3_not_before_m4")
+        sub["m3_not_before_m4"] = "binge" if binge else ("same_day" if day[3] == day[4] else "inverted")
+    elif result["ep3"] is None:
+        reasons.append("no_ep3_snapshot")
+        sub["no_ep3_snapshot"] = ("lost_to_floor" if result["floor"]["ep3"]["lost"] else result["ep3_reason"])
+    elif result["ep3"]["popularity"] is None or result["ep3"]["popularity"] < POPULARITY_MIN:
+        reasons.append("ep3_popularity_low")
+    if label is None:
+        reasons.append("no_primary_label")
+    return reasons, sub
+
+
+def build_all(candidates, w1_by_id, w2_by_id):
+    """One model_a_snapshots document per eligible show: markers, snapshots, features, label, ledger.
+
+    candidates: the model_a_candidates documents (eligible ones are used; w2 shows of any eligibility are not needed).
+    w1_by_id / w2_by_id: {_id: list of snapshots}. Features are built from w1 only; w2 goes to primary_label
+    and to the prequel lookup (a prequel's label), nowhere else.
+    """
+    eligible = [c for c in candidates if c.get("eligible")]
+    finale_day = {c["_id"]: c["trend_windows"]["w2"]["from"] + DAY for c in eligible if c.get("trend_windows")}
+    labels = {c["_id"]: primary_label(w2_by_id.get(c["_id"], []), finale_day[c["_id"]])
+              for c in eligible if c["_id"] in finale_day}
+    prequel_labels = {i: (lab["score"], finale_day[i]) for i, lab in labels.items() if lab}
+
+    results = {c["_id"]: snapshot_result(c["markers"]["schedule"], w1_by_id.get(c["_id"], [])) for c in eligible}
+    peers = {}
+    for c in eligible:
+        ep3 = results[c["_id"]]["ep3"]
+        if ep3 and ep3["popularity"] is not None and ep3["popularity"] >= POPULARITY_MIN:
+            peers.setdefault(season_key(c["season_year"], c["season"]), []).append(ep3["popularity"])
+
+    documents = []
+    for c in sorted(eligible, key=lambda c: c["_id"]):
+        show_id, result, label = c["_id"], results[c["_id"]], labels.get(c["_id"])
+        ep3 = result["ep3"]
+        popularity = ep3["popularity"] if ep3 else None
+        previous = previous_season(c["season_year"], c["season"])
+        prequel = prequel_features(c.get("relations"), prequel_labels, ep3["date"] if ep3 else None)
+        reasons, subreasons = ledger(c.get("w1_status"), result, trends.is_binge(c), label)
+        features = {
+            **score_features(result),
+            "ep3_popularity_season_pct": popularity_season_pct(popularity, peers.get(season_key(c["season_year"], c["season"]), [])),
+            "ep3_popularity_vs_prev_season": popularity_vs_previous(popularity, peers.get(season_key(*previous), [])),
+            "is_sequel": prequel["is_sequel"], "prequel_finale_score": prequel["prequel_finale_score"],
+            "prequel_score_known": prequel["prequel_score_known"],
+        }
+        documents.append({
+            "_id": show_id, "season": c["season"], "season_year": c["season_year"],
+            "status": "excluded" if reasons else "trainable", "reasons": reasons, "subreasons": subreasons,
+            "markers": {f"m{n}": result["markers"][n] for n in (1, 2, 3, 4)},
+            "ep1": result["ep1"], "ep3": ep3, "ep1_reason": result["ep1_reason"], "ep3_reason": result["ep3_reason"],
+            "floor": result["floor"], "features": features, "finale_day": finale_day.get(show_id),
+            "label": label, "prequel_dropped_by_date": prequel["prequel_dropped_by_date"],
+            "flags": {**result["flags"], "binge": trends.is_binge(c),
+                      "label_offset_unusual": bool(label and label["offset_unusual"]),
+                      "fallback_w1": c.get("marker_source", {}).get("w1") != "schedule",
+                      "fallback_w2": c.get("marker_source", {}).get("w2") != "schedule"},
+        })
+    return documents
