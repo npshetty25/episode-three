@@ -40,3 +40,20 @@ def bootstrap_ci(metric, y_true, y_pred, n=1000, seed=42, level=95):
     tail = (100 - level) / 2
     low, high = np.percentile(values, [tail, 100 - tail])
     return float(low), float(high)
+
+
+def paired_bootstrap_ci(err_model, err_baseline, n=1000, seed=42, level=95):
+    """Percentile bootstrap CI for the mean per-show difference (model error - baseline error).
+
+    Both error arrays are the absolute errors on the SAME shows, in the same order. Shows are resampled
+    together, so a show that is hard for both models counts the same on both sides. Returns (low, high):
+    entirely below 0 means the model is better than the baseline beyond sampling noise.
+    """
+    err_model, err_baseline = _arrays(err_model, err_baseline)
+    difference = err_model - err_baseline
+    rng = np.random.default_rng(seed)
+    indices = rng.integers(0, len(difference), size=(n, len(difference)))
+    means = difference[indices].mean(axis=1)
+    tail = (100 - level) / 2
+    low, high = np.percentile(means, [tail, 100 - tail])
+    return float(low), float(high)

@@ -104,3 +104,26 @@ def test_fingerprint_depends_on_the_data_not_the_order():
     assert data_a.data_fingerprint([a, b]) == data_a.data_fingerprint([b, a])
     changed = dict(b, label={"score": 99, "offset_days": 0, "secondary_score": None})
     assert data_a.data_fingerprint([a, b]) != data_a.data_fingerprint([a, changed])
+
+
+# --- paired bootstrap ------------------------------------------------------------------------------------------
+
+def test_paired_bootstrap_hand_cases():
+    # the model is better by exactly 1 point on every show: no spread, so the interval is exactly [-1, -1]
+    assert metrics.paired_bootstrap_ci([1, 2, 3, 4], [2, 3, 4, 5]) == (-1.0, -1.0)
+    # identical errors: the difference is 0 everywhere
+    assert metrics.paired_bootstrap_ci([1, 2, 3], [1, 2, 3]) == (0.0, 0.0)
+    # worse on every show
+    assert metrics.paired_bootstrap_ci([3, 3], [1, 1]) == (2.0, 2.0)
+
+
+def test_paired_bootstrap_is_reproducible_and_detects_a_real_gap_but_not_a_tie():
+    rng_values = [((i * 37) % 11) / 2 for i in range(120)]            # per-show errors of the baseline
+    better = [max(v - 0.5 + ((i * 13) % 5 - 2) / 10, 0) for i, v in enumerate(rng_values)]   # about 0.5 lower
+    low, high = metrics.paired_bootstrap_ci(better, rng_values)
+    assert (low, high) == metrics.paired_bootstrap_ci(better, rng_values) and high < 0
+    noisy = [v + (1 if i % 2 else -1) * 0.3 for i, v in enumerate(rng_values)]               # sometimes better, sometimes worse
+    low, high = metrics.paired_bootstrap_ci(noisy, rng_values)
+    assert low < 0 < high
+    with pytest.raises(ValueError):
+        metrics.paired_bootstrap_ci([1, 2], [1])
