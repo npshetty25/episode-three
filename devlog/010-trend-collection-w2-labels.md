@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-19
 - **Task:** TASK 010 from the instructor (spec v1.8 → v1.9)
-- **Status:** Code, cap choice, flags and spec done; the full w2 run and its label counts are Nirav's acceptance run (numbers below marked "pending").
+- **Status:** Done. Full w2 run and label check complete (results below).
 
 ## Summary
 
@@ -42,11 +42,22 @@ Narrow caps waste requests on many small batches (each costs at least one); wide
 - One live w2 batch (`--limit-batches 1`): 1 show, 10 records (predicted 12), 1 request, 0 × 429; `check_labels` found both labels, no flags.
 - `flag_marker_disagreement`: 16 of 1,377 (1.2%); ep1 1, ep2 6, ep3 7, ep4 9.
 
-## Pending (Nirav's acceptance run)
+## Acceptance run (Nirav, 2026-10-19)
 
-Full w2 run: actual vs predicted records, requests, runtime, 429s; `check_labels` counts (primary / secondary found, flag counts with example ids, fallback shows separately); verdict on show 130402 from `probe_trends_single`.
+- `pytest` 127 passed. Dry run: 1,376 shows (the 54 `skipped_no_w1` were already marked by my test run), 322 batches, 547 predicted requests.
+- Full run: **502 requests, 18.5 min, 0 x 429, 0 retries**, 0 duplicates. Actual 15,643 vs predicted 18,646 records (ratio **0.839**, steady 0.84-0.85 from batch 10 on; the stop rule never fired). The model over-predicts because it assumes a record for every show-day, and AniList has none for some days. Total w2 requests: 503 of 800. Second run: 0 requests.
+- w2_status: collected 1,374, `no_records` 3 (anilist:179062, 198374, 187062; TV, 12-13 eps), skipped_no_w1 54. Storage 22.8 MB of 512.
+- `check_labels` (1,374 collected): primary label 1,340 (97.5%), secondary 1,356 (98.7%), both 1,327 (96.6%), neither 5. Flags: no_transition 23, finale_episode_mismatch 32, label_at_window_edge 563. marker_disagreement 16.
+- Fallback_end_date shows (40): primary 26 (65.0%), secondary 38 (95.0%), no_transition 7, mismatch 11, edge 12. Schedule shows (1,334): primary 98.5%, secondary 98.8%.
+- Secondary minus primary: mean +1.59, median +1, within +-1 48.8%, within +-3 89.2%, largest 10. The secondary label is systematically higher: scores keep rising after the finale.
+- Show 130402: has trend records, first date 2021-03-01, episodes 8-12 only, 49 of 50 scored. So AniList's records for it begin at episode 8: no episode 1-4 snapshots, hence no w1 features. A data gap, not a collector bug.
+
+### The label_at_window_edge flag is mostly an artefact (found by me after the run)
+0-request check of where the primary label sits relative to the finale day (schedule shows): offset 0 = 1,206, +1 = 82, -1 = 15, other 15. All 551 edge cases are "label = FIRST stored record" (536 at offset 0, 15 at offset -1); none is the last record. Stored snapshots are trimmed to start at the finale day, so a label on the finale day is the first record by construction. The flag as defined cannot tell a good label from a bad one. The meaningful signals: offset -1 (15 shows, label before the finale day) and offset > +1 (12 shows, label later than expected). I have NOT changed the flag; changing a definition after seeing the data is the instructor's call.
 
 ## Open questions for the instructor
 
 1. Which single variant of the ep3-window rule is allowed? It is not implemented until named.
-2. Request total for Model A: 77 + 155 + 839 + 1 = 1,072 so far, plus Nirav's w2 run (about 548 predicted).
+2. Request total for Model A: 77 + 155 + 839 + 503 = 1,574 (w2 alone: 503 of 800).
+3. label_at_window_edge: redefine (e.g. flag only offset != 0 / last-record cases) or drop?
+4. The 3 `no_records` and 5 shows with neither label: exclude from training as untrainable?
