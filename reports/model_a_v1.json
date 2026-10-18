@@ -1,0 +1,324 @@
+{
+  "alpha": 100,
+  "code_commit": "e4f255dfb656c65cd804e45007130b1f4f03471f",
+  "criterion": {
+    "b1_mae": 1.6884,
+    "reduction_pct": 10.0127,
+    "required_pct": 10,
+    "result": "PASS",
+    "ridge_mae": 1.5194
+  },
+  "data_window": {
+    "evaluated": "Winter 2025 to Summer 2026",
+    "fit": "Fall 2018 to Fall 2024"
+  },
+  "family": "ridge",
+  "features": [
+    "ep3_score",
+    "ep1_score",
+    "score_delta_1_3",
+    "popularity",
+    "popularity_growth_1_3",
+    "ep3_in_progress",
+    "episodes_planned",
+    "prequel_finale_score",
+    "is_sequel",
+    "prequel_score_known",
+    "format",
+    "source_material",
+    "genres"
+  ],
+  "fitted": {
+    "b2_mean": 68.52,
+    "b3_coefficient": 1.0485,
+    "b3_intercept": -3.0783
+  },
+  "largest_errors": [
+    {
+      "abs_error": 12.575,
+      "ep3_score": 70.0,
+      "id": "anilist:153800",
+      "label": 54.0,
+      "prediction": 66.575,
+      "season": "Fall 2025",
+      "title": "One Punch Man 3"
+    },
+    {
+      "abs_error": 6.0294,
+      "ep3_score": 56.0,
+      "id": "anilist:180825",
+      "label": 61.0,
+      "prediction": 54.9706,
+      "season": "Spring 2025",
+      "title": "Maebashi Witches"
+    },
+    {
+      "abs_error": 5.5162,
+      "ep3_score": 69.0,
+      "id": "anilist:185116",
+      "label": 76.0,
+      "prediction": 70.4838,
+      "season": "Fall 2025",
+      "title": "Gnosia"
+    },
+    {
+      "abs_error": 5.1934,
+      "ep3_score": 64.0,
+      "id": "anilist:185262",
+      "label": 68.0,
+      "prediction": 62.8066,
+      "season": "Winter 2026",
+      "title": "Hell Mode: Yarikomi-zuki no Gamer wa Haisettei no Isekai de Musou Suru"
+    },
+    {
+      "abs_error": 5.1198,
+      "ep3_score": 73.0,
+      "id": "anilist:163144",
+      "label": 69.0,
+      "prediction": 74.1198,
+      "season": "Winter 2026",
+      "title": "TRIGUN STARGAZE"
+    },
+    {
+      "abs_error": 5.0351,
+      "ep3_score": 74.0,
+      "id": "anilist:177476",
+      "label": 70.0,
+      "prediction": 75.0351,
+      "season": "Spring 2025",
+      "title": "Shin Samurai-den YAIBA"
+    },
+    {
+      "abs_error": 5.0051,
+      "ep3_score": 68.0,
+      "id": "anilist:185875",
+      "label": 64.0,
+      "prediction": 69.0051,
+      "season": "Summer 2026",
+      "title": "Mahou Shoujo Lyrical Nanoha EXCEEDS Gun Blaze Vengeance"
+    },
+    {
+      "abs_error": 4.8079,
+      "ep3_score": 80.0,
+      "id": "anilist:170019",
+      "label": 76.0,
+      "prediction": 80.8079,
+      "season": "Spring 2026",
+      "title": "Otonari no Tenshi-sama ni Itsunomanika Dame Ningen ni Sareteita Ken 2nd Season"
+    },
+    {
+      "abs_error": 4.7182,
+      "ep3_score": 52.0,
+      "id": "anilist:175422",
+      "label": 57.0,
+      "prediction": 52.2818,
+      "season": "Winter 2025",
+      "title": "Baban Baban Ban Vampire"
+    },
+    {
+      "abs_error": 4.5533,
+      "ep3_score": 78.0,
+      "id": "anilist:180746",
+      "label": 74.0,
+      "prediction": 78.5533,
+      "season": "Winter 2026",
+      "title": "Shibou Yuugi de Meshi wo Kuu."
+    }
+  ],
+  "library_versions": {
+    "joblib": "1.6.0",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "python": "3.13.5",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.1"
+  },
+  "lock_sha256": "cfa2cd9a843cf1f9619d9a769a6296708ab0c2e0a6b41340fc126c4e0fb32e53",
+  "model": "Model A v1: Ridge on delta (finale - ep3 score)",
+  "paired": {
+    "ridge_minus_b1": {
+      "better": true,
+      "ci95": [
+        -0.2733,
+        -0.0594
+      ],
+      "mean": -0.1691
+    },
+    "ridge_minus_b3": {
+      "better": true,
+      "ci95": [
+        -0.2749,
+        -0.0715
+      ],
+      "mean": -0.1794
+    }
+  },
+  "popularity_variant": "raw",
+  "primary": {
+    "B1": {
+      "mae": 1.6884,
+      "mae_ci95": [
+        1.5282,
+        1.8516
+      ],
+      "rmse": 2.269,
+      "within_3": 89.3175
+    },
+    "B2": {
+      "mae": 7.1091,
+      "mae_ci95": [
+        6.5896,
+        7.6235
+      ],
+      "rmse": 8.5877,
+      "within_3": 24.9258
+    },
+    "B3": {
+      "mae": 1.6988,
+      "mae_ci95": [
+        1.5393,
+        1.8542
+      ],
+      "rmse": 2.2535,
+      "within_3": 84.273
+    },
+    "ridge": {
+      "mae": 1.5194,
+      "mae_ci95": [
+        1.3837,
+        1.6589
+      ],
+      "rmse": 2.0084,
+      "within_3": 88.4273
+    }
+  },
+  "rerun_reasons": [],
+  "rows": {
+    "evaluated": 337,
+    "fit": 873
+  },
+  "run_count": 1,
+  "sensitivity": {
+    "by_format": {
+      "ONA": {
+        "b1_mae": 1.8205,
+        "n": 39,
+        "ridge_mae": 1.7058
+      },
+      "TV": {
+        "b1_mae": 1.6711,
+        "n": 298,
+        "ridge_mae": 1.495
+      }
+    },
+    "by_sequel": {
+      "non_sequel": {
+        "b1_mae": 1.652,
+        "n": 250,
+        "ridge_mae": 1.5175
+      },
+      "sequel": {
+        "b1_mae": 1.7931,
+        "n": 87,
+        "ridge_mae": 1.5249
+      }
+    },
+    "excluding_flagged": {
+      "all_together": {
+        "flagged": 8,
+        "remaining": {
+          "b1_mae": 1.6717,
+          "n": 329,
+          "ridge_mae": 1.5034
+        }
+      },
+      "fallback_windows": {
+        "flagged": 6,
+        "remaining": {
+          "b1_mae": 1.6707,
+          "n": 331,
+          "ridge_mae": 1.497
+        }
+      },
+      "label_offset_unusual": {
+        "flagged": 1,
+        "remaining": {
+          "b1_mae": 1.6905,
+          "n": 336,
+          "ridge_mae": 1.5223
+        }
+      },
+      "m1_unknown": {
+        "flagged": 4,
+        "remaining": {
+          "b1_mae": 1.6727,
+          "n": 333,
+          "ridge_mae": 1.4981
+        }
+      },
+      "marker_disagreement": {
+        "flagged": 1,
+        "remaining": {
+          "b1_mae": 1.6875,
+          "n": 336,
+          "ridge_mae": 1.5229
+        }
+      }
+    },
+    "per_season": [
+      {
+        "b1_mae": 1.7209,
+        "n": 43,
+        "ridge_mae": 1.6874,
+        "season": "Winter 2025"
+      },
+      {
+        "b1_mae": 1.9535,
+        "n": 43,
+        "ridge_mae": 1.7974,
+        "season": "Spring 2025"
+      },
+      {
+        "b1_mae": 1.3077,
+        "n": 52,
+        "ridge_mae": 1.1459,
+        "season": "Summer 2025"
+      },
+      {
+        "b1_mae": 1.8125,
+        "n": 48,
+        "ridge_mae": 1.5942,
+        "season": "Fall 2025"
+      },
+      {
+        "b1_mae": 1.5,
+        "n": 48,
+        "ridge_mae": 1.4761,
+        "season": "Winter 2026"
+      },
+      {
+        "b1_mae": 1.7451,
+        "n": 51,
+        "ridge_mae": 1.6108,
+        "season": "Spring 2026"
+      },
+      {
+        "b1_mae": 1.8269,
+        "n": 52,
+        "ridge_mae": 1.4052,
+        "season": "Summer 2026"
+      }
+    ],
+    "secondary_label": {
+      "b1_mae_vs_primary_same_shows": 1.679,
+      "b1_mae_vs_secondary": 2.8179,
+      "n": 324,
+      "ridge_mae_vs_primary_same_shows": 1.5294,
+      "ridge_mae_vs_secondary": 2.6631,
+      "without_secondary_label": 13
+    }
+  },
+  "target": "delta = finale - ep3_score; prediction = clip(ep3_score + delta, 0, 100)",
+  "test_data_fingerprint": "18c8433b7da929c52dfaa51660d9822621e60a1109d0a4d5c6c6c6dc32b8a846",
+  "trainval_data_fingerprint": "67e472c9b5669d919146efd376deb439d98322119a6b7c7b597ec929b3636f14"
+}
