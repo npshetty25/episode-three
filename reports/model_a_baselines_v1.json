@@ -1,0 +1,144 @@
+{
+  "baselines": {
+    "B1": {
+      "train": {
+        "mae": 1.9853,
+        "rmse": 2.6416,
+        "within_3": 83.2599
+      },
+      "validation": {
+        "mae": 1.9479,
+        "mae_ci95": [
+          1.6926,
+          2.2135
+        ],
+        "rmse": 2.6634,
+        "within_3": 83.8542
+      }
+    },
+    "B2": {
+      "train": {
+        "mae": 7.7068,
+        "rmse": 9.7362,
+        "within_3": 24.6696
+      },
+      "validation": {
+        "mae": 6.8101,
+        "mae_ci95": [
+          6.0165,
+          7.6307
+        ],
+        "rmse": 8.9639,
+        "within_3": 38.0208
+      }
+    },
+    "B3": {
+      "train": {
+        "mae": 1.9646,
+        "rmse": 2.5775,
+        "within_3": 79.7357
+      },
+      "validation": {
+        "mae": 1.982,
+        "mae_ci95": [
+          1.7253,
+          2.2501
+        ],
+        "rmse": 2.6919,
+        "within_3": 79.6875
+      }
+    }
+  },
+  "bootstrap": {
+    "level": 95,
+    "resamples": 1000,
+    "seed": 42
+  },
+  "code_commit": "72f1a91e6256f41f46103e579ddaec094a8df8bd",
+  "data_fingerprint": "67e472c9b5669d919146efd376deb439d98322119a6b7c7b597ec929b3636f14",
+  "data_fingerprint_splits": [
+    "train",
+    "validation"
+  ],
+  "fitted": {
+    "b2_train_mean": 68.4112,
+    "b3_coefficient": 1.0587,
+    "b3_intercept": -3.7467
+  },
+  "library_versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "python": "3.13.5",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.1"
+  },
+  "rows": {
+    "train": 681,
+    "validation": 192
+  },
+  "test_split": "not loaded",
+  "validation_breakdown": {
+    "b1_by_flag": {
+      "any_of_three": {
+        "flagged": {
+          "mae": 2.4286,
+          "n": 7
+        },
+        "unflagged": {
+          "mae": 1.9297,
+          "n": 185
+        }
+      },
+      "label_offset_unusual": {
+        "flagged": {
+          "mae": 3.3333,
+          "n": 3
+        },
+        "unflagged": {
+          "mae": 1.9259,
+          "n": 189
+        }
+      },
+      "m1_unknown": {
+        "flagged": {
+          "mae": 1.0,
+          "n": 3
+        },
+        "unflagged": {
+          "mae": 1.963,
+          "n": 189
+        }
+      },
+      "marker_disagreement": {
+        "flagged": {
+          "mae": 3.5,
+          "n": 2
+        },
+        "unflagged": {
+          "mae": 1.9316,
+          "n": 190
+        }
+      }
+    },
+    "b1_by_format": {
+      "ONA": {
+        "mae": 2.3846,
+        "n": 13
+      },
+      "TV": {
+        "mae": 1.9162,
+        "n": 179
+      }
+    },
+    "b1_by_sequel": {
+      "non_sequel": {
+        "mae": 2.0072,
+        "n": 139
+      },
+      "sequel": {
+        "mae": 1.7925,
+        "n": 53
+      }
+    }
+  }
+}
