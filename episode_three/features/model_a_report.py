@@ -12,7 +12,7 @@ from episode_three.features import model_a
 SPLITS = ("train", "validation", "test")
 FLAGS = ("marker_disagreement", "m1_unknown", "multi_episode_premiere", "label_offset_unusual",
          "fallback_w1", "fallback_w2", "binge")
-STEP_ORDER = ("no_w1_records", "no_ep1_4_trends", "m3_not_before_m4", "no_ep3_snapshot",
+STEP_ORDER = ("no_w1_records", "m3_not_before_m4", "no_ep1_4_trends", "no_ep3_snapshot",
               "ep3_popularity_low", "no_primary_label")
 
 

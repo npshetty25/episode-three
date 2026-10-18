@@ -221,7 +221,7 @@ def assert_splits_disjoint(split_by_id, season_by_id):
 def ledger(w1_status, result, binge, label):
     """(reasons, subreasons) for one show; no reasons = trainable.
 
-    Reasons, in funnel order: no_w1_records, no_ep1_4_trends, m3_not_before_m4 (+ binge / same_day / inverted),
+    Reasons, in funnel order: no_w1_records, m3_not_before_m4 (binge first, then same_day / inverted), no_ep1_4_trends,
     no_ep3_snapshot (+ empty_window / lost_to_floor / no_scored_record), ep3_popularity_low, no_primary_label.
     The first reason is the funnel step; the others are listed because they are also true.
     """
@@ -229,12 +229,15 @@ def ledger(w1_status, result, binge, label):
     day = {n: result["markers"][n]["day"] for n in (3, 4)}
     if w1_status != "collected":
         reasons.append("no_w1_records")
+    elif binge:   # spec v1.8 item 8: a binge release falls under M(3) < M(4), even though its markers are missing
+        reasons.append("m3_not_before_m4")
+        sub["m3_not_before_m4"] = "binge"
     elif day[3] is None or day[4] is None:
         reasons.append("no_ep1_4_trends")
         sub["no_ep1_4_trends"] = "no_m3_m4" if day[3] is None and day[4] is None else ("no_m3" if day[3] is None else "no_m4")
     elif not day[3] < day[4]:
         reasons.append("m3_not_before_m4")
-        sub["m3_not_before_m4"] = "binge" if binge else ("same_day" if day[3] == day[4] else "inverted")
+        sub["m3_not_before_m4"] = "same_day" if day[3] == day[4] else "inverted"
     elif result["ep3"] is None:
         reasons.append("no_ep3_snapshot")
         sub["no_ep3_snapshot"] = ("lost_to_floor" if result["floor"]["ep3"]["lost"] else result["ep3_reason"])

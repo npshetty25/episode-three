@@ -21,8 +21,8 @@ Each show is counted at the first step it fails (funnel order). `Also` counts th
 | Step | Excluded here | Remaining | Also true (later reasons) |
 |---|---:|---:|---:|
 | no_w1_records | 54 | 1,377 | 0 |
-| no_ep1_4_trends | 30 | 1,347 | 0 |
-| m3_not_before_m4 | 6 | 1,341 | 0 |
+| m3_not_before_m4 | 25 | 1,352 | 0 |
+| no_ep1_4_trends | 11 | 1,341 | 0 |
 | no_ep3_snapshot | 31 | 1,310 | 0 |
 | ep3_popularity_low | 85 | 1,225 | 0 |
 | no_primary_label | 15 | 1,210 | 76 |
@@ -31,9 +31,10 @@ Each show is counted at the first step it fails (funnel order). `Also` counts th
 
 Sub-reasons:
 
+- m3_not_before_m4 / binge: 19
 - m3_not_before_m4 / same_day: 6
 - no_ep1_4_trends / no_m3: 4
-- no_ep1_4_trends / no_m3_m4: 24
+- no_ep1_4_trends / no_m3_m4: 5
 - no_ep1_4_trends / no_m4: 2
 - no_ep3_snapshot / lost_to_floor: 1
 - no_ep3_snapshot / no_scored_record: 30

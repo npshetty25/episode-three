@@ -127,6 +127,7 @@ def test_ledger_reasons_for_marker_problems():
     label = {"score": 1}
     assert ma.ledger("collected", result(None, None), False, label) == (["no_ep1_4_trends"], {"no_ep1_4_trends": "no_m3_m4"})
     assert ma.ledger("collected", result(day(1, 5), day(1, 5)), True, label)[1] == {"m3_not_before_m4": "binge"}
+    assert ma.ledger("collected", result(None, None), True, label) == (["m3_not_before_m4"], {"m3_not_before_m4": "binge"})  # no markers at all
     assert ma.ledger("collected", result(day(1, 5), day(1, 5)), False, label)[1] == {"m3_not_before_m4": "same_day"}
     assert ma.ledger("collected", result(day(1, 6), day(1, 5)), False, label)[1] == {"m3_not_before_m4": "inverted"}
     assert ma.ledger("collected", result(day(1, 1), day(1, 3), lost=True), False, label)[1] == {"no_ep3_snapshot": "lost_to_floor"}
