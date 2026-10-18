@@ -60,3 +60,23 @@ def test_printable_lines_name_the_chosen_family(tiny):
     assert f"Chosen family (lowest validation MAE): {report['chosen_family']}" in text
     assert "Permutation importance" in text and "Configurations fitted: 12" in text
     assert np.isfinite(report["validation"]["ridge"]["mae"])
+
+
+# --- TASK 014 ruling a: the alpha extension ---------------------------------------------------------------------
+
+def test_alpha_extension_chooses_by_cv_and_never_touches_validation_for_the_choice():
+    train = make_df()
+    one = make_df(years=(2024,), per_year=30, split="validation", seed=5)
+    two = make_df(years=(2024,), per_year=30, split="validation", seed=99)
+    a = select_a.extend_ridge_alpha(train, one, "c" * 40)
+    b = select_a.extend_ridge_alpha(train, two, "c" * 40)
+    assert [row["alpha"] for row in a["cv"]] == list(select_a.EXTENDED_ALPHAS)
+    assert a["chosen_alpha"] == b["chosen_alpha"] and a["cv"] == b["cv"]          # chosen on train CV only
+    assert a["chosen_cv_mae"] == min(row["mean_cv_mae"] for row in a["cv"])
+    assert a["chosen_at_boundary"] == (a["chosen_alpha"] in (0.1, 3000))
+    assert a["validation_at_chosen_alpha"] != b["validation_at_chosen_alpha"]      # validation is only re-reported
+    assert a["test_split"] == "not loaded" and a["popularity_variant"] == "raw"
+    assert "diff_vs_b1" in a["validation_at_chosen_alpha"] and "diff_vs_b3" in a["validation_at_alpha_100"]
+    text = "\n".join(select_a.extension_lines(a))
+    assert "CV-best" in text and "Chosen alpha (" in text
+    assert json.dumps(a, sort_keys=True) == json.dumps(select_a.extend_ridge_alpha(train, one, "c" * 40), sort_keys=True)

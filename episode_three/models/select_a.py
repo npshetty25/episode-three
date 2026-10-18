@@ -133,3 +133,55 @@ def selection_lines(report):
     c = report["counts"]
     lines += ["", f"Configurations fitted: {c['configurations']} ({c['cv_fits']} CV fits + {c['refits']} refits on train)."]
     return lines
+
+
+# --- TASK 014 ruling a: the Ridge alpha boundary extension (before the test lock) --------------------------------
+
+EXTENDED_ALPHAS = (0.1, 1, 10, 100, 300, 1000, 3000)
+
+
+def extend_ridge_alpha(train, validation, code_commit, alphas=EXTENDED_ALPHAS, variant="raw"):
+    """Ridge-only time CV over a wider alpha grid (popularity fixed), then validation re-reported for the CV-best alpha.
+
+    The family and the popularity variant are NOT reopened whatever validation shows; only alpha is chosen, by CV.
+    """
+    result = train_a.tune_family("ridge", train, variant, grid={"model__alpha": list(alphas)})
+    chosen = result["best_params"]["model__alpha"]
+    X_val, _, y_val = features_a.build_xy(validation, variant)
+    truth = y_val.to_numpy(dtype=float)
+    predictions, _ = baselines_a.run_baselines(train, validation)
+    baselines = {"B1": predictions["B1"]["validation"], "B3": predictions["B3"]["validation"]}
+
+    def validation_row(alpha):
+        model = train_a.fit_family("ridge", {"model__alpha": alpha}, variant, train)
+        return validation_scores(truth, train_a.predict_finale(model, X_val), baselines)
+
+    return {
+        "code_commit": code_commit, "popularity_variant": variant, "alphas": list(alphas),
+        "cv": [{"alpha": x["params"]["model__alpha"], "mean_cv_mae": r(x["mean_cv_mae"]),
+                "per_fold": [r(v) for v in x["per_fold"]]} for x in result["results"]],
+        "chosen_alpha": chosen, "chosen_cv_mae": r(result["best_cv_mae"]),
+        "chosen_at_boundary": chosen in (min(alphas), max(alphas)),
+        "validation_at_chosen_alpha": validation_row(chosen),
+        "validation_at_alpha_100": validation_row(100),
+        "test_split": "not loaded",
+    }
+
+
+def extension_lines(extension):
+    lines = [f"Ridge alpha extension (time CV inside train, popularity {extension['popularity_variant']}):",
+             f"  {'alpha':>7}  {'CV MAE':>7}   per fold 2020 / 2021 / 2022 / 2023"]
+    for row in extension["cv"]:
+        mark = "  <- CV-best" if row["alpha"] == extension["chosen_alpha"] else ""
+        lines.append(f"  {row['alpha']:>7}  {row['mean_cv_mae']:>7.3f}   " + " ".join(f"{v:5.2f}" for v in row["per_fold"]) + mark)
+    where = (f"boundary: {extension['chosen_alpha']}" if extension["chosen_at_boundary"]
+             else f"interior: {extension['chosen_alpha']}")
+    lines += ["", f"Chosen alpha ({where}), CV MAE {extension['chosen_cv_mae']:.3f}.", "",
+              "Validation, re-reported (192 shows; paired difference = Ridge error - baseline error):"]
+    for label, key in (("alpha " + str(extension["chosen_alpha"]), "validation_at_chosen_alpha"), ("alpha 100 (TASK 013)", "validation_at_alpha_100")):
+        row = extension[key]
+        d1, d3 = row["diff_vs_b1"], row["diff_vs_b3"]
+        lines.append(f"  {label:<22} MAE {row['mae']:.2f} [{row['mae_ci95'][0]:.2f}, {row['mae_ci95'][1]:.2f}]  RMSE {row['rmse']:.2f}  "
+                     f"within +-3 {row['within_3']:.1f}%  vs B1 {d1['mean']:+.3f} [{d1['ci95'][0]:+.3f}, {d1['ci95'][1]:+.3f}]  "
+                     f"vs B3 {d3['mean']:+.3f} [{d3['ci95'][0]:+.3f}, {d3['ci95'][1]:+.3f}]")
+    return lines

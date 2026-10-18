@@ -71,13 +71,16 @@ def finale_mae_scorer(estimator, X, y_delta):
     return -float(np.mean(np.abs(truth - predict_finale(estimator, X))))
 
 
-def tune_family(family, train_df, popularity_variant):
-    """Grid search with the time folds. Returns the best params, its per-fold MAE and every configuration's CV MAE."""
+def tune_family(family, train_df, popularity_variant, grid=None):
+    """Grid search with the time folds. Returns the best params, its per-fold MAE and every configuration's CV MAE.
+
+    `grid` overrides the declared grid (TASK 014 uses it for the Ridge alpha extension only).
+    """
     if not (train_df["split"] == "train").all():
         raise ValueError("tune_family accepts the train split only: validation rows must never reach the search")
     X, y_delta, _ = features_a.build_xy(train_df, popularity_variant)
     folds = time_folds(train_df)
-    search = GridSearchCV(make_pipeline(family), GRIDS[family], cv=folds, scoring=finale_mae_scorer,
+    search = GridSearchCV(make_pipeline(family), grid or GRIDS[family], cv=folds, scoring=finale_mae_scorer,
                           refit=False, error_score="raise", n_jobs=1)
     search.fit(X, y_delta)
     results = []
